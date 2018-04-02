@@ -133,10 +133,14 @@ class updateS3Bucket(object):
 
             #validate file gdb
             elif os.path.isdir(item) and filename.find('gdb'):
-                desc = arcpy.Describe(filename)
-                if desc.dataType == 'Workspace':
-                    messages.addMessage('Found a valid file geodatabase: ' + filename)
-                    return 'fgdb'
+                # definitely a problem in the try, since it prints the except...
+                try:
+                    desc = arcpy.Describe(item)
+                    if desc.dataType == 'Workspace':
+                        messages.addMessage('Found a valid file geodatabase: ' + filename + ', item: ' + item )
+                        return 'fgdb'
+                except:
+                    messages.addErrorMessage('You did not select a valid file geodatabase: ' + filename)
 
             else:
                 messages.addErrorMessage('You did not select a valid schema: ' + item)
@@ -184,9 +188,9 @@ class updateS3Bucket(object):
                 messages.addMessage('Finished copying')
 
         #start main program
-        destinationBucket = 's3://streamstats-staged-data'
+        destinationBucket = 's3://test.wim.usgs.gov/ss-kj'
 
-        states = ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "CRB","DC", "DE", "DRB", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "RRB", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"]
+        states = ["KJ", "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "CRB","DC", "DE", "DRB", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "RRB", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"]
 
         messages.addGPMessages()
         
@@ -207,11 +211,11 @@ class updateS3Bucket(object):
 
                 if copy_archydro == 'true' and validateStreamStatsDataFolder(folder, 'archydro'):
                     messages.addMessage('Copying archydro folder for: ' + state)
-                    copyToS3(folder + '/archydro',destinationBucket + '/data/' + state + '/archydro', '--recursive --dryrun')
+                    copyToS3(folder + '/archydro',destinationBucket + '/data/' + state + '/archydro', '--recursive')
 
                 if copy_bc_layers == 'true' and validateStreamStatsDataFolder(folder, 'bc_layers'):
                     messages.addMessage('Copying bc_layers folder for: ' + state)
-                    copyToS3(folder + '/bc_layers',destinationBucket + '/data/' + state + '/bc_layers', '--recursive --dryrun')
+                    copyToS3(folder + '/bc_layers',destinationBucket + '/data/' + state + '/bc_layers', '--recursive')
 
         #check for xml file input
         if xml_files:
@@ -223,7 +227,7 @@ class updateS3Bucket(object):
 
                 if validateStreamStatsXML(xml) == True:
                     filename = xml.replace('\\','/').split('/')[-1]
-                    copyToS3(xml, destinationBucket + '/xml/' + filename, '--dryrun')
+                    copyToS3(xml, destinationBucket + '/xml/' + filename, '')
 
         #check for schema file input
         if schema_files:
@@ -238,9 +242,9 @@ class updateS3Bucket(object):
                 rootname = schema.replace('\\','/').split('/')[-1]
 
                 if schemaType == 'fgbd':
-                    copyToS3(schema, destinationBucket + '/schemas/' + rootname, '--recursive --dryrun')
+                    copyToS3(schema, destinationBucket + '/schemas/' + rootname, '--recursive')
                 if schemaType == 'prj':
-                    copyToS3(schema, destinationBucket + '/schemas/' + rootname, '--dryrun')
+                    copyToS3(schema, destinationBucket + '/schemas/' + rootname)
                      
 
 
