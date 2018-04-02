@@ -108,6 +108,7 @@ class updateS3Bucket(object):
 
             #validate xml file
             stateabbr = filename.split('.xml')[0].split('StreamStats')[1].upper()
+            messages.addMessage('stateabbr:' + stateabbr)
             if fnmatch.fnmatch(filename, 'StreamStats*.xml') and stateabbr in states:
                 return True
             else:
@@ -210,11 +211,11 @@ class updateS3Bucket(object):
 
                 if copy_archydro == 'true' and validateStreamStatsDataFolder(folder, 'archydro'):
                     messages.addMessage('Copying archydro folder for: ' + state)
-                    copyToS3(folder + '/archydro',destinationBucket + '/data/' + state + '/archydro', '--recursive')
+                    copyToS3(folder + '/archydro',destinationBucket + '/data/' + state + '/archydro', '--recursive --dryrun')
 
                 if copy_bc_layers == 'true' and validateStreamStatsDataFolder(folder, 'bc_layers'):
                     messages.addMessage('Copying bc_layers folder for: ' + state)
-                    copyToS3(folder + '/bc_layers',destinationBucket + '/data/' + state + '/bc_layers', '--recursive')
+                    copyToS3(folder + '/bc_layers',destinationBucket + '/data/' + state + '/bc_layers', '--recursive --dryrun')
 
         #check for xml file input
         if xml_files:
@@ -226,7 +227,7 @@ class updateS3Bucket(object):
 
                 if validateStreamStatsXML(xml) == True:
                     filename = xml.replace('\\','/').split('/')[-1]
-                    copyToS3(xml, destinationBucket + '/xml/' + filename, '')
+                    copyToS3(xml, destinationBucket + '/xml/' + filename, '--dryrun')
 
         #check for schema file input
         if schema_files:
@@ -239,13 +240,11 @@ class updateS3Bucket(object):
 
                 schemaType = validateStreamStatsSchema(schema)
                 rootname = schema.replace('\\','/').split('/')[-1]
-                messages.addMessage('test1 -- schemaType is: ' + schemaType)
 
                 if schemaType == 'fgdb':
-                    messages.addMessage('test2 -- schemaType is: ' + schemaType)
-                    copyToS3(schema, destinationBucket + '/schemas/' + schema, '--recursive')
+                    copyToS3(schema, destinationBucket + '/schemas/' + schema, '--recursive --dryrun')
                 if schemaType == 'prj':
-                    copyToS3(schema, destinationBucket + '/schemas/' + schema)
+                    copyToS3(schema, destinationBucket + '/schemas/' + schema, '--dryrun')
                      
 
 
