@@ -133,7 +133,6 @@ class updateS3Bucket(object):
 
             #validate file gdb
             elif os.path.isdir(item) and filename.find('gdb'):
-                # definitely a problem in the try, since it prints the except...
                 try:
                     desc = arcpy.Describe(item)
                     if desc.dataType == 'Workspace':
@@ -188,7 +187,7 @@ class updateS3Bucket(object):
                 messages.addMessage('Finished copying')
 
         #start main program
-        destinationBucket = 's3://test.wim.usgs.gov/ss-kj'
+        destinationBucket = 's3://streamstats-staged-data/KJ'
 
         states = ["KJ", "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "CRB","DC", "DE", "DRB", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "RRB", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"]
 
@@ -240,11 +239,13 @@ class updateS3Bucket(object):
 
                 schemaType = validateStreamStatsSchema(schema)
                 rootname = schema.replace('\\','/').split('/')[-1]
+                messages.addMessage('test1 -- schemaType is: ' + schemaType)
 
-                if schemaType == 'fgbd':
-                    copyToS3(schema, destinationBucket + '/schemas/' + rootname, '--recursive')
+                if schemaType == 'fgdb':
+                    messages.addMessage('test2 -- schemaType is: ' + schemaType)
+                    copyToS3(schema, destinationBucket + '/schemas/' + schema, '--recursive')
                 if schemaType == 'prj':
-                    copyToS3(schema, destinationBucket + '/schemas/' + rootname)
+                    copyToS3(schema, destinationBucket + '/schemas/' + schema)
                      
 
 
