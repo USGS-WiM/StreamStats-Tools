@@ -1,0 +1,48 @@
+[
+    {
+      "name": "StreamStats-Tools",
+      "organization": "U.S. Geological Survey",
+      "description": "A collection of tools for StreamStats data preparation and upload to AWS",
+      "version": "v0.0.0",
+      "status": ["Development"],
+  
+      "permissions": {
+        "usageType": "openSource",
+        "licenses": [
+          {
+            "name": "Public Domain",
+            "URL": "https://github.com/usgs/StreamStats-Tools/blob/master/LICENSE.md"
+          }
+        ]
+      },
+  
+      "homepageURL": "https://wim.usgs.gov",
+      "downloadURL": "https://github.com/USGS-WiM/StreamStats-Tools/archive/master.zip",
+      "disclaimerURL": "https://github.com/USGS-WiM/StreamStats-Tools/blob/master/DISCLAIMER.md",
+      "repositoryUrl": "https://github.com/USGS-WiM/StreamStats-Tools",
+      "vcs": "git",
+  
+      "laborHours": null,
+  
+      "tags": [
+        "streamstats",
+        "tools",
+        "python",
+        "toolbox"
+      ],
+  
+      "languages": [
+        "python"
+      ],
+  
+      "contact": {
+        "name": "Jeremy Newson",
+        "email": "jknewson@usgs.gov"
+      },
+  
+      "date": {
+        "metadataLastUpdated": "2018-04-19"
+      }
+    }
+  ]
+  

@@ -1,4 +1,10 @@
-import arcpy
+import sys, os, subprocess, fnmatch, traceback
+
+import datetime, arcpy, shutil, json, ArcHydroTools, logging, re, xml.dom.minidom, decimal
+from arcpy import env
+from arcpy.sa import *
+from Delineation import Delineation as Delineation
+from BasinParameters import BasinParameters as BasinParameters
 
 class Toolbox(object):
     def __init__(self):
@@ -6,7 +12,7 @@ class Toolbox(object):
         self.alias  = "ss-tools"
 
         # List of tool classes associated with this toolbox
-        self.tools = [updateS3Bucket] 
+        self.tools = [updateS3Bucket, basinTools] 
 
 class updateS3Bucket(object):
     def __init__(self):
@@ -81,7 +87,6 @@ class updateS3Bucket(object):
         xml_files      = parameters[3].valueAsText
         schema_files   = parameters[4].valueAsText
         
-        import os, sys, subprocess, traceback, fnmatch
 
         try:
             import secrets
@@ -247,5 +252,145 @@ class updateS3Bucket(object):
                     copyToS3(schema, destinationBucket + '/schemas/' + schema, '--dryrun')
                      
 
+class basinTools(object):
+    # region Constructor
+    def __init__(self):
+        self.label = "Basin Tools"
+        self.description = "Tools for basin delineation and characteristics"
 
-         
+    def getParameterInfo(self):
+        # Define parameter definitions
+
+        directory = arcpy.Parameter(
+            displayName="Working directory",
+            name="directory",
+            datatype="DEFolder",
+            parameterType="Optional",
+            direction="Input")
+
+        stabbr = arcpy.Parameter(
+            displayName="Abbreviated state name",
+            name="stabbr",
+            datatype="GPString",
+            parameterType="Required",
+            direction="Input")
+
+        delineate = arcpy.Parameter(
+            displayName="Delineate Basin",
+            name="delineate",
+            datatype="GPBoolean",
+            parameterType="Optional",
+            direction="Input")
+
+        basin_params = arcpy.Parameter(
+            displayName="Calculate Basin Characteristics",
+            name="basin_params",
+            datatype="GPBoolean",
+            parameterType="Optional",
+            direction="Input")
+
+        pourpoint = arcpy.Parameter(
+            displayName="Pour point",
+            name="pourpoint",
+            datatype="GPString",
+            parameterType="Optional",
+            direction="Input")
+
+        pourpointwkid = arcpy.Parameter(
+            displayName="Esri Well Known ID (wkid)",
+            name="pourpointwkid",
+            datatype="GPString",
+            parameterType="Optional",
+            direction="Input")
+
+        workspaceID = arcpy.Parameter(
+            displayName="Working folder",
+            name="workspaceID",
+            datatype="GPString",
+            parameterType="Optional",
+            direction="Input")
+        
+        parameters_list = arcpy.Parameter(
+            displayName="Parameters",
+            name="parameters_list",
+            datatype="GPString",
+            parameterType="Optional",
+            direction="Input")
+
+        parameters = [directory, stabbr, delineate, basin_params, pourpoint, pourpointwkid, workspaceID, parameters_list]
+        return parameters
+    
+    def isLicensed(self):
+        return True
+
+    def updateParameters(self, parameters):
+        return
+
+    def UpdateMessages(self, parameters):
+        return
+
+    def execute(self, parameters, messages):
+        if not parameters[0].value:
+            parameters[0].value = 'D:\ClientData'
+        if not parameters[1].value:
+            parameters[1].value = "IA"
+        if not parameters[4].value:
+            parameters[4].value = '[-93.7364137172699,42.30612989064221]'
+        if not parameters[5].value:
+            parameters[5].value = '4326'
+        if not parameters[6].value:
+            parameters[6].value = 'IA'
+        if not parameters[7].value:
+            parameters[7].value = 'DRNAREA;CCM;I24H10Y;STRMTOT'
+        directory       = parameters[0].valueAsText
+        stabbr          = parameters[1].valueAsText
+        delineate       = parameters[2].valueAsText
+        basin_params    = parameters[3].valueAsText
+        ppoint          = parameters[4].valueAsText
+        pourpointwkid   = parameters[5].valueAsText
+        workspaceID     = parameters[6].valueAsText
+        parameters_list = parameters[7].valueAsText
+
+        messages.addMessage('directory: ' + directory + ", ppoint: " + ppoint + ", pourpointwkid: " + pourpointwkid )
+
+        Results = {}
+
+        if delineate:
+            messages.addMessage('delineating Basin')
+            try:
+                regionID = stabbr
+                if regionID == '#' or not regionID:
+                    raise Exception('Input Study Area required')
+    
+                ssdel = Delineation(regionID, directory)
+                ssdel.Delineate(ppoint)
+                
+
+                Results = {
+                        "Workspace": ssdel.WorkspaceID,
+                        "Message": ssdel.Message.replace("'",'"').replace('\n',' ')
+                        }
+
+            except:
+                tb = traceback.format_exc()
+                messages.addMessage(tb)
+                Results = {
+                        "error": {"message": tb}
+                        }
+
+            finally:
+                print "Results="+json.dumps(Results) 
+
+
+        if basin_params:
+            messages.addMessage('Calculating Basin Parameters')
+            ssBp = BasinParameters(stabbr, directory, workspaceID, basin_params)
+            
+
+            if ssBp.isComplete:
+                Results = {"Parameters": ssBp.ParameterList, "Message": ssBp.Message.replace("'",'"').replace('\n',' ')}
+            else:
+                Results = {"Parameters": [],"Message": ssBp.Message.replace("'",'"').replace('\n',' ')}
+
+            print "Results="+json.dumps(Results) 
+
