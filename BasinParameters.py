@@ -43,21 +43,21 @@ class BasinParameters(object):
     #region Constructor
     def __init__(self, regionID, directory, workspaceID, pList): 
         self.RegionID = regionID
-        self.__xmlPath__ = r"e:\XML" 
         self.WorkspaceID = workspaceID
         self.isComplete = False
         self.Message =""    
         self.__MainDirectory__ = os.path.join(directory,self.WorkspaceID)
         self.__TempLocation__ = os.path.join(self.__MainDirectory__, "Temp")
+        self.__xmlPath__ = os.path.join(self.__TempLocation__, "StreamStats"+regionID+".xml")
         self.ParameterList = None
 
         logdir = os.path.join(self.__TempLocation__, 'parameter.log')
         logging.basicConfig(filename=logdir, format ='%(asctime)s %(message)s', level=logging.DEBUG)
          
-        #Test if workspace exists before run   
+         #Test if workspace exists before run   
         if(not self.__workspaceValid__(os.path.join(self.__MainDirectory__, self.WorkspaceID+".gdb","Layers"))):
             return
-
+        
         self.__run__(pList)  
             
     #endregion  
@@ -118,11 +118,11 @@ class BasinParameters(object):
              tb = traceback.format_exc()
              self.__sm__("Error reading parameters "+tb,"ERROR")
     def __getDirectory__(self, subDirectory):
-        if os.path.exists(subDirectory): 
-            shutil.rmtree(subDirectory)
-        os.makedirs(subDirectory);
+            if os.path.exists(subDirectory): 
+                shutil.rmtree(subDirectory)
+            os.makedirs(subDirectory);
 
-        return subDirectory
+            return subDirectory
     def __workspaceValid__(self, workspace):
         if not arcpy.Exists(workspace):
             self.__sm__("Workspace " + workspace + " does not exist")

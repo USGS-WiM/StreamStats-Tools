@@ -265,11 +265,11 @@ class basinTools(object):
             displayName="Working directory",
             name="directory",
             datatype="DEFolder",
-            parameterType="Optional",
+            parameterType="Required",
             direction="Input")
 
         stabbr = arcpy.Parameter(
-            displayName="Abbreviated state name",
+            displayName="Abbreviated region name",
             name="stabbr",
             datatype="GPString",
             parameterType="Required",
@@ -293,7 +293,7 @@ class basinTools(object):
             displayName="Pour point",
             name="pourpoint",
             datatype="GPString",
-            parameterType="Optional",
+            parameterType="Required",
             direction="Input")
 
         pourpointwkid = arcpy.Parameter(
@@ -304,14 +304,14 @@ class basinTools(object):
             direction="Input")
 
         workspaceID = arcpy.Parameter(
-            displayName="Working folder",
+            displayName="Workspace folder",
             name="workspaceID",
             datatype="GPString",
             parameterType="Optional",
             direction="Input")
         
         parameters_list = arcpy.Parameter(
-            displayName="Parameters",
+            displayName="Parameters (required if calculating basin characteristics)",
             name="parameters_list",
             datatype="GPString",
             parameterType="Optional",
@@ -330,18 +330,10 @@ class basinTools(object):
         return
 
     def execute(self, parameters, messages):
-        if not parameters[0].value:
-            parameters[0].value = 'D:\ClientData'
-        if not parameters[1].value:
-            parameters[1].value = "IA"
-        if not parameters[4].value:
-            parameters[4].value = '[-93.7364137172699,42.30612989064221]'
         if not parameters[5].value:
             parameters[5].value = '4326'
         if not parameters[6].value:
-            parameters[6].value = 'IA'
-        if not parameters[7].value:
-            parameters[7].value = 'DRNAREA;CCM;I24H10Y;STRMTOT'
+            parameters[6].value = parameters[1].valueAsText + str(datetime.datetime.now()).replace('-','').replace(' ','').replace(':','').replace('.','')
         directory       = parameters[0].valueAsText
         stabbr          = parameters[1].valueAsText
         delineate       = parameters[2].valueAsText
@@ -351,19 +343,23 @@ class basinTools(object):
         workspaceID     = parameters[6].valueAsText
         parameters_list = parameters[7].valueAsText
 
-        messages.addMessage('directory: ' + directory + ", ppoint: " + ppoint + ", pourpointwkid: " + pourpointwkid )
-
         Results = {}
 
-        if delineate:
+        if not delineate and not basin_params:
+            messages.addWarningMessage('Nothing to do.  Make sure you select at least one checkbox')
+            sys.exit()
+
+        if delineate == 'true' or basin_params == 'true':
             messages.addMessage('delineating Basin')
             try:
                 regionID = stabbr
                 if regionID == '#' or not regionID:
                     raise Exception('Input Study Area required')
+
     
-                ssdel = Delineation(regionID, directory)
-                ssdel.Delineate(ppoint)
+                ssdel = Delineation(regionID, directory, workspaceID)
+                ppnt = ssdel._buildAHPourpoint(ppoint, pourpointwkid)
+                ssdel.Delineate(ppnt)
                 
 
                 Results = {
@@ -382,9 +378,9 @@ class basinTools(object):
                 print "Results="+json.dumps(Results) 
 
 
-        if basin_params:
+        if basin_params == 'true':
             messages.addMessage('Calculating Basin Parameters')
-            ssBp = BasinParameters(stabbr, directory, workspaceID, basin_params)
+            ssBp = BasinParameters(stabbr, directory, workspaceID, parameters_list)
             
 
             if ssBp.isComplete:

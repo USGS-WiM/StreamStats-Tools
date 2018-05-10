@@ -40,13 +40,13 @@ import xml.dom.minidom
 
 class Delineation(object):
     #region Constructor
-    def __init__(self, regionID, directory):
+    def __init__(self, regionID, directory, workspaceID):
         self.Message =""
-        self.__schemaPath__ = r"E:\schemas"
-        self.__xmlPath__ = r"E:\XML" 
+        self.__schemaPath__ = os.path.join(directory,"schemas")
+        self.__xmlPath__ = os.path.join(directory,"xml")
         self.__regionID__ = regionID        
         self.__templatePath__ = os.path.join(self.__schemaPath__,self.__regionID__ + "_ss.gdb","Layers")
-        self.WorkspaceID = self.__regionID__ + str(datetime.datetime.now()).replace('-','').replace(' ','').replace(':','').replace('.','')
+        self.WorkspaceID = workspaceID
         self.__WorkspaceDirectory__ = self.__getDirectory__(os.path.join(directory, self.WorkspaceID))
 
         self.__TempLocation__ = os.path.join(self.__WorkspaceDirectory__, "Temp")
@@ -118,7 +118,7 @@ class Delineation(object):
     #region Helper Methods
     def __removePolygonHoles__(self, polyFC, path):
         try:
-
+            
             result = arcpy.EliminatePolygonPart_management(polyFC, os.path.join(path,"GlobalWatershed"), "AREA", "90 squaremeters", 1, "ANY")#modified CONTAINED_ONLY
 
             self.__sm__(arcpy.GetMessages())
@@ -173,4 +173,37 @@ class Delineation(object):
 
         if type in ('ERROR'): logging.error(msg)
         else : logging.info(msg)
+    def _buildAHPourpoint(self, ppt, wkid):
+            try:
+                arcpy.env.workspace = self.__TempLocation__
+                arcpy.env.overwriteOutput = False
+                #get spatial ref
+                wkid = int(wkid)
+                sr = arcpy.SpatialReference(wkid)
+                pourPoint = {"type":"Point","coordinates":json.loads(ppt)}
+                arcpy.env.overwriteOutput = True
+                FC = arcpy.CreateFeatureclass_management("in_memory", "FC", "POINT", spatial_reference=sr)
+                #add required attributes
+                t_fields = (  
+                            ("Name", "TEXT"),
+                            ("Descript", "TEXT"), 
+                            ("SnapOn", "SHORT"),
+                            ("SrcType", "SHORT"),
+                            ("BATCHDONE", "SHORT") 
+                            )
+                for t_field in t_fields:  
+                    arcpy.AddField_management(FC, *t_field)  
+
+                # Create insert cursor for table
+                fields = [i[0] for i in t_fields]
+                fields.insert(0,'SHAPE@')
+
+                with arcpy.da.InsertCursor(FC,fields) as cursor:
+                    cursor.insertRow([arcpy.AsShape(pourPoint),"ags101","",None,None,None])
+                #next cursor
+
+                return FC
+            except:
+                tb = traceback.format_exc()
+                print tb
     #endregion
