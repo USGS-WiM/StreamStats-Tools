@@ -261,17 +261,17 @@ class basinTools(object):
     def getParameterInfo(self):
         # Define parameter definitions
 
-        directory = arcpy.Parameter(
-            displayName="Working directory",
-            name="directory",
-            datatype="DEFolder",
-            parameterType="Required",
-            direction="Input")
-
         stabbr = arcpy.Parameter(
             displayName="Abbreviated region name",
             name="stabbr",
             datatype="GPString",
+            parameterType="Required",
+            direction="Input")
+
+        directory = arcpy.Parameter(
+            displayName="Working directory",
+            name="directory",
+            datatype="DEFolder",
             parameterType="Required",
             direction="Input")
 
@@ -290,10 +290,10 @@ class basinTools(object):
             direction="Input")
 
         pourpoint = arcpy.Parameter(
-            displayName="Pour point",
+            displayName="Pour point (required if delineating basin)",
             name="pourpoint",
             datatype="GPString",
-            parameterType="Required",
+            parameterType="Optional",
             direction="Input")
 
         pourpointwkid = arcpy.Parameter(
@@ -317,76 +317,132 @@ class basinTools(object):
             parameterType="Optional",
             direction="Input")
 
-        parameters = [directory, stabbr, delineate, basin_params, pourpoint, pourpointwkid, workspaceID, parameters_list]
+        output_basin = arcpy.Parameter(
+            displayName="Output Watershed",
+            name="output_basin",
+            datatype="DEFeatureClass",
+            parameterType="Required",
+            direction="Output")
+
+        parameters = [stabbr, directory, delineate, basin_params, pourpoint, pourpointwkid, workspaceID, parameters_list, output_basin] 
         return parameters
     
     def isLicensed(self):
         return True
 
     def updateParameters(self, parameters):
+        workspace = arcpy.env.workspace
+        if workspace:
+            targetpath = workspace
+            for ext in ('.gdb', '.mdb', '.sde'):
+                if workspace.lower().endswith(ext):
+                    dfname = 'Layers'
+                    try:
+                        mxd=arcpy.mapping.MapDocument('CURRENT')
+                    except:
+                        mxd = None
+                    if mxd:
+                        df = mxd.activeDataFrame
+                        dfname = df.name.strip()
+                    targetpath = os.path.join(targetpath,dfname)
+        if parameters[0].altered:
+            if not parameters[1].altered:
+                parameters[1].value = os.path.join("D:\ClientData", parameters[0].valueAsText)
+            if not parameters[6].altered:
+                parameters[6].value = parameters[0].valueAsText + str(datetime.datetime.now()).replace('-','').replace(' ','').replace(':','').replace('.','')
+        if not parameters[5].altered:
+            parameters[5].value = '4326'
+        if not parameters[8].altered:
+            try:
+                parameters[8].value = os.path.join(targetpath,'Watershed')
+            except:
+                parameters[8].value=''
         return
 
     def UpdateMessages(self, parameters):
         return
 
-    def execute(self, parameters, messages):
-        if not parameters[5].value:
-            parameters[5].value = '4326'
-        if not parameters[6].value:
-            parameters[6].value = parameters[1].valueAsText + str(datetime.datetime.now()).replace('-','').replace(' ','').replace(':','').replace('.','')
-        directory       = parameters[0].valueAsText
-        stabbr          = parameters[1].valueAsText
+    def execute(self, parameters, messages): 
+        stabbr          = parameters[0].valueAsText
+        directory       = parameters[1].valueAsText
         delineate       = parameters[2].valueAsText
         basin_params    = parameters[3].valueAsText
-        ppoint          = parameters[4].valueAsText
+        pourpoint          = parameters[4].valueAsText
         pourpointwkid   = parameters[5].valueAsText
         workspaceID     = parameters[6].valueAsText
         parameters_list = parameters[7].valueAsText
+        output_basin    = parameters[8].valueAsText
+
+        arcpy.env.overwriteOutput = True
 
         Results = {}
+
+        GW_location = os.path.join(directory, workspaceID, workspaceID + '.gdb')
+        GW_file = os.path.join(GW_location, 'Layers', 'GlobalWatershed')
 
         if not delineate and not basin_params:
             messages.addWarningMessage('Nothing to do.  Make sure you select at least one checkbox')
             sys.exit()
 
         if delineate == 'true' or basin_params == 'true':
-            messages.addMessage('delineating Basin')
+            if arcpy.Exists(GW_file):  
+                messages.addMessage('Delineated basin already exists. Skipping delineation process')
+            else:
+                messages.addMessage('delineating Basin')
+                try:
+                    ssdel = Delineation(stabbr, directory, workspaceID)
+                    ppoint = ssdel._buildAHPourpoint(pourpoint, pourpointwkid)
+                    ssdel.Delineate(ppoint)
+                    
+
+                    Results = {
+                            "Workspace": ssdel.WorkspaceID,
+                            "Message": ssdel.Message.replace("'",'"').replace('\n',' ')
+                            }
+
+                except:
+                    tb = traceback.format_exc()
+                    messages.addMessage(tb)
+                    Results = {
+                            "error": {"message": tb}
+                            }
+
+                finally:
+                    print "Results="+json.dumps(Results) 
+
+            if not basin_params or basin_params != 'true':
+                Output_location = os.path.dirname(output_basin)
+                Output_file = os.path.basename(output_basin)
+                        
+                if arcpy.Exists(GW_file):
+                    messages.addMessage('Converting to output file')
+                    arcpy.FeatureClassToFeatureClass_conversion(GW_file, Output_location, Output_file)
+
+
+        if basin_params == 'true':
             try:
-                regionID = stabbr
-                if regionID == '#' or not regionID:
-                    raise Exception('Input Study Area required')
+                messages.addMessage('Calculating Basin Parameters')
+                ssBp = BasinParameters(stabbr, directory, workspaceID, parameters_list)
+            
 
-    
-                ssdel = Delineation(regionID, directory, workspaceID)
-                ppnt = ssdel._buildAHPourpoint(ppoint, pourpointwkid)
-                ssdel.Delineate(ppnt)
-                
+                if ssBp.isComplete:
+                    Results = {"Parameters": ssBp.ParameterList, "Message": ssBp.Message.replace("'",'"').replace('\n',' ')}
+                else:
+                    Results = {"Parameters": [],"Message": ssBp.Message.replace("'",'"').replace('\n',' ')}
 
-                Results = {
-                        "Workspace": ssdel.WorkspaceID,
-                        "Message": ssdel.Message.replace("'",'"').replace('\n',' ')
-                        }
-
+                print "Results="+json.dumps(Results)
             except:
                 tb = traceback.format_exc()
                 messages.addMessage(tb)
                 Results = {
-                        "error": {"message": tb}
-                        }
-
+                    "error": {"message": tb}
+                }
             finally:
-                print "Results="+json.dumps(Results) 
+                print "Results=" + json.dumps(Results)
+                Output_location = os.path.dirname(output_basin)
+                Output_file = os.path.basename(output_basin)
 
-
-        if basin_params == 'true':
-            messages.addMessage('Calculating Basin Parameters')
-            ssBp = BasinParameters(stabbr, directory, workspaceID, parameters_list)
-            
-
-            if ssBp.isComplete:
-                Results = {"Parameters": ssBp.ParameterList, "Message": ssBp.Message.replace("'",'"').replace('\n',' ')}
-            else:
-                Results = {"Parameters": [],"Message": ssBp.Message.replace("'",'"').replace('\n',' ')}
-
-            print "Results="+json.dumps(Results) 
+                if arcpy.Exists(GW_file):
+                    messages.addMessage('converting file')
+                    arcpy.FeatureClassToFeatureClass_conversion(GW_file, Output_location, Output_file)        
 

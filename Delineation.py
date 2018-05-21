@@ -44,7 +44,8 @@ class Delineation(object):
         self.Message =""
         self.__schemaPath__ = os.path.join(directory,"schemas")
         self.__xmlPath__ = os.path.join(directory,"xml")
-        self.__regionID__ = regionID        
+        self.__dataPath__ = os.path.join(directory,"data")
+        self.__regionID__ = regionID       
         self.__templatePath__ = os.path.join(self.__schemaPath__,self.__regionID__ + "_ss.gdb","Layers")
         self.WorkspaceID = workspaceID
         self.__WorkspaceDirectory__ = self.__getDirectory__(os.path.join(directory, self.WorkspaceID))
@@ -79,8 +80,12 @@ class Delineation(object):
             self.__sm__("Template spatial ref: "+ sr.name)
 
             self.__sm__("Delineation Started") 
-            datasetPath = arcpy.CreateFileGDB_management(self.__WorkspaceDirectory__, self.WorkspaceID +'.gdb')[0]
-            featurePath = arcpy.CreateFeatureDataset_management(datasetPath,'Layers', sr)[0]
+            datasetPath = os.path.join(self.__WorkspaceDirectory__, self.WorkspaceID + '.gdb')[0]
+            featurePath = os.path.join(datasetPath,'Layers')[0]
+            if not arcpy.Exists(datasetPath):
+                datasetPath = arcpy.CreateFileGDB_management(self.__WorkspaceDirectory__, self.WorkspaceID +'.gdb')[0]
+            if not arcpy.Exists(featurePath):
+                featurePath = arcpy.CreateFeatureDataset_management(datasetPath,'Layers', sr)[0]
 
             self.__sm__("creating workspace environment. "+ datasetPath)
             
@@ -90,7 +95,7 @@ class Delineation(object):
                                                      templateFeaturePath.format("GlobalWatershed"), "SAME_AS_TEMPLATE", "SAME_AS_TEMPLATE",sr)
             
             xmlPath = self.__SSXMLPath__("StreamStats{0}.xml".format(self.__regionID__), self.__TempLocation__, self.__TempLocation__)
-                        
+
             arcpy.CheckOutExtension("Spatial")
             self.__sm__("Starting Delineation")
 
@@ -109,7 +114,7 @@ class Delineation(object):
         finally:
             #Local cleanup
             del GWP
-            del sr            
+            del sr
             arcpy.Delete_management(PourPoint)
             arcpy.Delete_management(GW)
             #arcpy.Delete_management(self.__TempLocation__)
@@ -154,9 +159,18 @@ class Delineation(object):
             if newTempWorkspace == "#":
                 return xmlFile
 
+            archydroPath = os.path.join(self.__dataPath__,"archydro")
+            bcLayersPath = os.path.join(self.__dataPath__,"bc_layers")
+
             #update tempworkspace
             xmlDoc = xml.dom.minidom.parse(xmlFile)
             xmlDoc.getElementsByTagName('TempLocation')[0].firstChild.data = newTempWorkspace
+            xmlDoc.getElementsByTagName('RASTERDATAPATH')[0].firstChild.data = bcLayersPath
+            xmlDoc.getElementsByTagName('VECTORDATAPATH')[0].firstChild.data = os.path.join(archydroPath,"global.gdb")
+            xmlDoc.getElementsByTagName('RasterLocation')[0].firstChild.data = archydroPath
+            xmlDoc.getElementsByTagName('VectorLocation')[0].firstChild.data = os.path.join(archydroPath,"global.gdb")
+            xmlDoc.getElementsByTagName('DataPath')[0].firstChild.data = archydroPath
+            xmlDoc.getElementsByTagName('GlobalDataPath')[0].firstChild.data = os.path.join(archydroPath,"global.gdb")
             file = open(xmlFile,"wb")
             xmlDoc.writexml(file)
 

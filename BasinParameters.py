@@ -100,7 +100,7 @@ class BasinParameters(object):
         except:
             tb = traceback.format_exc() 
             self.__sm__("Error calculating parameters "+tb,"ERROR")
-            self.isComplete = False     
+            self.isComplete = False
     def __parseParameterXML__(self, xmlfile):
         paramList = []
         try:
