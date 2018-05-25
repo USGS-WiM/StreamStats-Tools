@@ -22,33 +22,28 @@
 #endregion
 
 #region "Imports"
-import sys
 import traceback
-import datetime
 import os
-import argparse
 import arcpy
 import shutil
 import json
 import ArcHydroTools
 from arcpy.sa import *
 import logging
-import re
 
 import xml.dom.minidom
 #endregion
 
 class Delineation(object):
     #region Constructor
-    def __init__(self, regionID, directory, workspaceID):
+    def __init__(self, regionID, schemas, xml, workspaceID):
         self.Message =""
-        self.__schemaPath__ = os.path.join(directory,"schemas")
-        self.__xmlPath__ = os.path.join(directory,"xml")
-        self.__dataPath__ = os.path.join(directory,"data")
+        self.__schemaPath__ = schemas
+        self.__xmlPath__ = xml
         self.__regionID__ = regionID       
-        self.__templatePath__ = os.path.join(self.__schemaPath__,self.__regionID__ + "_ss.gdb","Layers")
-        self.WorkspaceID = workspaceID
-        self.__WorkspaceDirectory__ = self.__getDirectory__(os.path.join(directory, self.WorkspaceID))
+        self.__templatePath__ = os.path.join(self.__schemaPath__,"Layers")
+        self.WorkspaceID = os.path.basename(workspaceID)
+        self.__WorkspaceDirectory__ = self.__getDirectory__(workspaceID)
 
         self.__TempLocation__ = os.path.join(self.__WorkspaceDirectory__, "Temp")
 
@@ -134,12 +129,11 @@ class Delineation(object):
             return polyFC       
     def __getDirectory__(self, subDirectory, makeTemp = True):
         try:
-            if os.path.exists(subDirectory): 
-                shutil.rmtree(subDirectory)
-            os.makedirs(subDirectory);
+            if not os.path.exists(subDirectory): 
+                os.makedirs(subDirectory);
 
             #temp dir
-            if makeTemp:
+            if makeTemp and not os.path.exists(os.path.join(subDirectory, "Temp")):
                 os.makedirs(os.path.join(subDirectory, "Temp"))
  
 
@@ -151,7 +145,7 @@ class Delineation(object):
         file = None
         try:
             #move the file to tempDirectory
-            xmlFile = os.path.join(self.__xmlPath__, xmlFileName)
+            xmlFile = self.__xmlPath__
             if copyToDirectory != "#":
                 shutil.copy(xmlFile, copyToDirectory)
                 xmlFile = os.path.join(copyToDirectory,xmlFileName)
@@ -159,18 +153,9 @@ class Delineation(object):
             if newTempWorkspace == "#":
                 return xmlFile
 
-            archydroPath = os.path.join(self.__dataPath__,"archydro")
-            bcLayersPath = os.path.join(self.__dataPath__,"bc_layers")
-
             #update tempworkspace
             xmlDoc = xml.dom.minidom.parse(xmlFile)
             xmlDoc.getElementsByTagName('TempLocation')[0].firstChild.data = newTempWorkspace
-            xmlDoc.getElementsByTagName('RASTERDATAPATH')[0].firstChild.data = bcLayersPath
-            xmlDoc.getElementsByTagName('VECTORDATAPATH')[0].firstChild.data = os.path.join(archydroPath,"global.gdb")
-            xmlDoc.getElementsByTagName('RasterLocation')[0].firstChild.data = archydroPath
-            xmlDoc.getElementsByTagName('VectorLocation')[0].firstChild.data = os.path.join(archydroPath,"global.gdb")
-            xmlDoc.getElementsByTagName('DataPath')[0].firstChild.data = archydroPath
-            xmlDoc.getElementsByTagName('GlobalDataPath')[0].firstChild.data = os.path.join(archydroPath,"global.gdb")
             file = open(xmlFile,"wb")
             xmlDoc.writexml(file)
 

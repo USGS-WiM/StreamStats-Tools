@@ -1,6 +1,6 @@
 import sys, os, subprocess, fnmatch, traceback
 
-import datetime, arcpy, shutil, json, ArcHydroTools, logging, re, xml.dom.minidom, decimal
+import datetime, arcpy, json, logging, pythonaddins
 from arcpy import env
 from arcpy.sa import *
 from Delineation import Delineation as Delineation
@@ -61,7 +61,7 @@ class updateS3Bucket(object):
             multiValue=True)
         
         parameters = [state_folders, copy_archydro, copy_bc_layers, xml_files, schema_files]
-        
+    
         return parameters
 
     def isLicensed(self): #optional
@@ -193,7 +193,7 @@ class updateS3Bucket(object):
                 messages.addMessage('Finished copying')
 
         #start main program
-        destinationBucket = 's3://streamstats-staged-data'
+        destinationBucket = 's3://streamstats-staged-data/KJ'
 
         states = ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "CRB","DC", "DE", "DRB", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "RRB", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"]
 
@@ -216,11 +216,11 @@ class updateS3Bucket(object):
 
                 if copy_archydro == 'true' and validateStreamStatsDataFolder(folder, 'archydro'):
                     messages.addMessage('Copying archydro folder for: ' + state)
-                    copyToS3(folder + '/archydro',destinationBucket + '/data/' + state + '/archydro', '--recursive --dryrun')
+                    copyToS3(folder + '/archydro',destinationBucket + '/data/' + state + '/archydro', '--recursive')
 
                 if copy_bc_layers == 'true' and validateStreamStatsDataFolder(folder, 'bc_layers'):
                     messages.addMessage('Copying bc_layers folder for: ' + state)
-                    copyToS3(folder + '/bc_layers',destinationBucket + '/data/' + state + '/bc_layers', '--recursive --dryrun')
+                    copyToS3(folder + '/bc_layers',destinationBucket + '/data/' + state + '/bc_layers', '--recursive')
 
         #check for xml file input
         if xml_files:
@@ -232,7 +232,7 @@ class updateS3Bucket(object):
 
                 if validateStreamStatsXML(xml) == True:
                     filename = xml.replace('\\','/').split('/')[-1]
-                    copyToS3(xml, destinationBucket + '/xml/' + filename, '--dryrun')
+                    copyToS3(xml, destinationBucket + '/xml/' + filename, '')
 
         #check for schema file input
         if schema_files:
@@ -247,9 +247,9 @@ class updateS3Bucket(object):
                 rootname = schema.replace('\\','/').split('/')[-1]
 
                 if schemaType == 'fgdb':
-                    copyToS3(schema, destinationBucket + '/schemas/' + schema, '--recursive --dryrun')
+                    copyToS3(schema, destinationBucket + '/schemas/' + rootname, '--recursive')
                 if schemaType == 'prj':
-                    copyToS3(schema, destinationBucket + '/schemas/' + schema, '--dryrun')
+                    copyToS3(schema, destinationBucket + '/schemas/' + rootname)
                      
 
 class basinTools(object):
@@ -265,20 +265,34 @@ class basinTools(object):
             displayName="Abbreviated region name",
             name="stabbr",
             datatype="GPString",
-            parameterType="Required",
+            parameterType="Optional",
             direction="Input")
 
-        directory = arcpy.Parameter(
-            displayName="Working directory",
-            name="directory",
-            datatype="DEFolder",
-            parameterType="Required",
+        schema_file = arcpy.Parameter(
+            displayName="Regional schema FGDB or PRJ file",
+            name="schema_file",
+            datatype="DEType",
+            parameterType="Optional",
+            direction="Input")
+        
+        xml_file = arcpy.Parameter(
+            displayName="Regional xml",
+            name="xml_file",
+            datatype="DEFile",
+            parameterType="Optional",
             direction="Input")
 
         delineate = arcpy.Parameter(
             displayName="Delineate Basin",
             name="delineate",
             datatype="GPBoolean",
+            parameterType="Optional",
+            direction="Input")
+
+        workspaceID = arcpy.Parameter(
+            displayName="Workspace folder",
+            name="workspaceID",
+            datatype="DEFolder",
             parameterType="Optional",
             direction="Input")
 
@@ -302,13 +316,6 @@ class basinTools(object):
             datatype="GPString",
             parameterType="Optional",
             direction="Input")
-
-        workspaceID = arcpy.Parameter(
-            displayName="Workspace folder",
-            name="workspaceID",
-            datatype="GPString",
-            parameterType="Optional",
-            direction="Input")
         
         parameters_list = arcpy.Parameter(
             displayName="Parameters (required if calculating basin characteristics)",
@@ -321,42 +328,43 @@ class basinTools(object):
             displayName="Output Watershed",
             name="output_basin",
             datatype="DEFeatureClass",
-            parameterType="Required",
+            parameterType="Optional",
             direction="Output")
+        
+        input_basin = arcpy.Parameter(
+            displayName="Input Watershed",
+            name="input_basin",
+            datatype="DEFeatureClass",
+            parameterType="Optional",
+            direction="Input")
 
-        parameters = [stabbr, directory, delineate, basin_params, pourpoint, pourpointwkid, workspaceID, parameters_list, output_basin] 
+        parameters = [stabbr, schema_file, xml_file, workspaceID, delineate, basin_params, pourpoint, pourpointwkid, parameters_list, output_basin, input_basin] 
         return parameters
     
     def isLicensed(self):
         return True
 
     def updateParameters(self, parameters):
-        workspace = arcpy.env.workspace
-        if workspace:
-            targetpath = workspace
-            for ext in ('.gdb', '.mdb', '.sde'):
-                if workspace.lower().endswith(ext):
-                    dfname = 'Layers'
-                    try:
-                        mxd=arcpy.mapping.MapDocument('CURRENT')
-                    except:
-                        mxd = None
-                    if mxd:
-                        df = mxd.activeDataFrame
-                        dfname = df.name.strip()
-                    targetpath = os.path.join(targetpath,dfname)
-        if parameters[0].altered:
-            if not parameters[1].altered:
-                parameters[1].value = os.path.join("D:\ClientData", parameters[0].valueAsText)
-            if not parameters[6].altered:
-                parameters[6].value = parameters[0].valueAsText + str(datetime.datetime.now()).replace('-','').replace(' ','').replace(':','').replace('.','')
-        if not parameters[5].altered:
-            parameters[5].value = '4326'
-        if not parameters[8].altered:
-            try:
-                parameters[8].value = os.path.join(targetpath,'Watershed')
-            except:
-                parameters[8].value=''
+        if not parameters[7].altered:
+            parameters[7].value = '4326'
+        if parameters[3].altered and not parameters[9].altered:
+            if parameters[4].value:
+                workspace_name = os.path.basename(parameters[3].valueAsText)
+                parameters[9].value = os.path.join(parameters[3].valueAsText, workspace_name+'.gdb','Watershed')
+        if parameters[9].altered:
+            basin_dir = os.path.dirname(parameters[9].valueAsText)
+            if not basin_dir.endswith('.gdb') or parameters[9].valueAsText.endswith('.shp'):
+                try:
+                    pythonaddins.MessageBox("Basin must be within a geodatabase, and should not be an '.shp' file.", 'ERROR', 0)
+                except Exception, ErrorDesc:
+                    logger.error("There was an error setting error message: "+str(ErrorDesc))
+        if parameters[10].altered:
+            basin_dir = os.path.dirname(parameters[10].valueAsText)
+            if not basin_dir.endswith('.gdb') or parameters[10].valueAsText.endswith('.shp'):
+                try:
+                    pythonaddins.MessageBox("Basin must be within a geodatabase, and should not be an '.shp' file.", 'ERROR', 0)
+                except Exception, ErrorDesc:
+                    logger.error("There was an error setting error message: "+str(ErrorDesc))
         return
 
     def UpdateMessages(self, parameters):
@@ -364,33 +372,39 @@ class basinTools(object):
 
     def execute(self, parameters, messages): 
         stabbr          = parameters[0].valueAsText
-        directory       = parameters[1].valueAsText
-        delineate       = parameters[2].valueAsText
-        basin_params    = parameters[3].valueAsText
-        pourpoint          = parameters[4].valueAsText
-        pourpointwkid   = parameters[5].valueAsText
-        workspaceID     = parameters[6].valueAsText
-        parameters_list = parameters[7].valueAsText
-        output_basin    = parameters[8].valueAsText
+        schema_file     = parameters[1].valueAsText
+        xml_file        = parameters[2].valueAsText
+        workspaceID     = parameters[3].valueAsText
+        delineate       = parameters[4].valueAsText
+        basin_params    = parameters[5].valueAsText
+        pourpoint       = parameters[6].valueAsText
+        pourpointwkid   = parameters[7].valueAsText
+        parameters_list = parameters[8].valueAsText
+        output_basin    = parameters[9].valueAsText
+        input_basin     = parameters[10].valueAsText
 
         arcpy.env.overwriteOutput = True
 
         Results = {}
-
-        GW_location = os.path.join(directory, workspaceID, workspaceID + '.gdb')
+        workspace_name = os.path.basename(workspaceID)
+        GW_location = os.path.join(workspaceID, workspace_name + '.gdb')
         GW_file = os.path.join(GW_location, 'Layers', 'GlobalWatershed')
+        
 
         if not delineate and not basin_params:
             messages.addWarningMessage('Nothing to do.  Make sure you select at least one checkbox')
             sys.exit()
 
         if delineate == 'true' or basin_params == 'true':
-            if arcpy.Exists(GW_file):  
+            if input_basin and arcpy.Exists(input_basin):  
                 messages.addMessage('Delineated basin already exists. Skipping delineation process')
             else:
-                messages.addMessage('delineating Basin')
+                messages.addMessage('Delineating Basin')
+                if not pourpoint:
+                    messages.addErrorMessage('Delineation needs a pourpoint')
+                    sys.exit()
                 try:
-                    ssdel = Delineation(stabbr, directory, workspaceID)
+                    ssdel = Delineation(stabbr, schema_file, xml_file, workspaceID)
                     ppoint = ssdel._buildAHPourpoint(pourpoint, pourpointwkid)
                     ssdel.Delineate(ppoint)
                     
@@ -417,12 +431,13 @@ class basinTools(object):
                 if arcpy.Exists(GW_file):
                     messages.addMessage('Converting to output file')
                     arcpy.FeatureClassToFeatureClass_conversion(GW_file, Output_location, Output_file)
+                    arcpy.Delete_management(GW_file)
 
 
         if basin_params == 'true':
             try:
                 messages.addMessage('Calculating Basin Parameters')
-                ssBp = BasinParameters(stabbr, directory, workspaceID, parameters_list)
+                ssBp = BasinParameters(stabbr, workspaceID, parameters_list, input_basin)
             
 
                 if ssBp.isComplete:
@@ -439,10 +454,11 @@ class basinTools(object):
                 }
             finally:
                 print "Results=" + json.dumps(Results)
-                Output_location = os.path.dirname(output_basin)
-                Output_file = os.path.basename(output_basin)
+                if output_basin:
+                    Output_location = os.path.dirname(output_basin)
+                    Output_file = os.path.basename(output_basin)
 
-                if arcpy.Exists(GW_file):
-                    messages.addMessage('converting file')
-                    arcpy.FeatureClassToFeatureClass_conversion(GW_file, Output_location, Output_file)        
+                    if arcpy.Exists(GW_file):
+                        messages.addMessage('Converting to output file')
+                        arcpy.FeatureClassToFeatureClass_conversion(GW_file, Output_location, Output_file)        
 

@@ -20,17 +20,13 @@
 #endregion
 
 #region "Imports"
-import sys
 import traceback
 import os
-import argparse
 import arcpy
 import shutil
-import json
 import logging
 import ArcHydroTools
 import xml.dom.minidom
-import decimal
 from arcpy import env
 #endregion
 
@@ -41,12 +37,12 @@ from arcpy import env
 
 class BasinParameters(object):
     #region Constructor
-    def __init__(self, regionID, directory, workspaceID, pList): 
+    def __init__(self, regionID, workspaceID, pList, input_basin): 
         self.RegionID = regionID
-        self.WorkspaceID = workspaceID
+        self.WorkspaceID = os.path.basename(workspaceID)
         self.isComplete = False
         self.Message =""    
-        self.__MainDirectory__ = os.path.join(directory,self.WorkspaceID)
+        self.__MainDirectory__ = workspaceID
         self.__TempLocation__ = os.path.join(self.__MainDirectory__, "Temp")
         self.__xmlPath__ = os.path.join(self.__TempLocation__, "StreamStats"+regionID+".xml")
         self.ParameterList = None
@@ -58,12 +54,12 @@ class BasinParameters(object):
         if(not self.__workspaceValid__(os.path.join(self.__MainDirectory__, self.WorkspaceID+".gdb","Layers"))):
             return
         
-        self.__run__(pList)  
+        self.__run__(pList, input_basin)  
             
     #endregion  
          
     #Private Methods
-    def __run__(self, parameters):
+    def __run__(self, parameters, input_basin):
         workspace = ''
         plist = None
         xmlfile =''
@@ -80,10 +76,16 @@ class BasinParameters(object):
            
             arcpy.CheckOutExtension("Spatial")
             self.__sm__("Stated calc params")
-            ArcHydroTools.StreamstatsGlobalParametersServer(os.path.join(workspace,"GlobalWatershed"), 
-                                                            os.path.join(workspace,"GlobalWatershedPoint"), 
+
+            if arcpy.Exists(input_basin):
+                ArcHydroTools.StreamstatsGlobalParametersServer(input_basin, os.path.join(workspace,"GlobalWatershedPoint"), 
                                                             parameters, outputFile.format(".xml"), outputFile.format(".htm"), 
                                                             xmlfile,"", self.WorkspaceID )
+            else:
+                ArcHydroTools.StreamstatsGlobalParametersServer(os.path.join(workspace,"GlobalWatershed"), 
+                                                                os.path.join(workspace,"GlobalWatershedPoint"), 
+                                                                parameters, outputFile.format(".xml"), outputFile.format(".htm"), 
+                                                                xmlfile,"", self.WorkspaceID )
 
             self.__sm__(arcpy.GetMessages(),'AHMSG')
             arcpy.CheckInExtension("Spatial")
