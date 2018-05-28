@@ -77,10 +77,11 @@ class BasinParameters(object):
             arcpy.CheckOutExtension("Spatial")
             self.__sm__("Stated calc params")
 
-            if arcpy.Exists(input_basin):
-                ArcHydroTools.StreamstatsGlobalParametersServer(input_basin, os.path.join(workspace,"GlobalWatershedPoint"), 
-                                                            parameters, outputFile.format(".xml"), outputFile.format(".htm"), 
-                                                            xmlfile,"", self.WorkspaceID )
+            if input_basin:
+                if arcpy.Exists(input_basin):
+                    ArcHydroTools.StreamstatsGlobalParametersServer(input_basin, os.path.join(workspace,"GlobalWatershedPoint"), 
+                                                                parameters, outputFile.format(".xml"), outputFile.format(".htm"), 
+                                                                xmlfile,"", self.WorkspaceID )
             else:
                 ArcHydroTools.StreamstatsGlobalParametersServer(os.path.join(workspace,"GlobalWatershed"), 
                                                                 os.path.join(workspace,"GlobalWatershedPoint"), 

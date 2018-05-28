@@ -390,6 +390,63 @@ class basinTools(object):
         GW_location = os.path.join(workspaceID, workspace_name + '.gdb')
         GW_file = os.path.join(GW_location, 'Layers', 'GlobalWatershed')
         
+        def validatePourPoint(ppoint):
+            """validatePourPoint(ppoint=None)
+                Determines if input pourpoint is a valid json point
+            """
+
+            if ppoint.startswith('[') and ppoint.endswith(']'):
+                messages.addMessage('Found a valid pourpoint: ' + ppoint)
+                return ppoint
+            else:
+                messages.addErrorMessage('You did not select a valid pourpoint.  Make sure it is contained within square brackets.')
+                sys.exit()
+
+        def validateXML(xml):
+            """validateStreamStatsXML(xml=None)
+                Determines if input xml is a valid streamstats XML file
+            """
+
+            #get filename
+            filename = xml.replace('\\','/').split('/')[-1]
+            #validate xml file
+            if fnmatch.fnmatch(filename, 'StreamStats*.xml'):
+                messages.addMessage('Found a valid .xml file: ' + filename)
+                return xml
+            else:
+                messages.addErrorMessage('You did not select a valid xml file: ' + filename)
+                sys.exit()
+                
+        def validateSchema(item):
+            """validateSchema(item=None)
+                Determines if input schema is either a valid .prj file or a valid file geodatabse
+            """
+
+            filename = item.replace('\\','/').split('/')[-1]
+
+            #validate prj file
+            if os.path.isfile(item) and fnmatch.fnmatch(filename, '*.prj'):
+                try:
+                    arcpy.SpatialReference(filename)
+                except:
+                    messages.addErrorMessage('You did not select a valid prj file: ' + filename)
+                else:
+                    messages.addMessage('Found a valid .prj file: ' + filename)
+                    return item
+
+            #validate file gdb
+            elif os.path.isdir(item) and filename.find('gdb'):
+                try:
+                    desc = arcpy.Describe(item)
+                    if desc.dataType == 'Workspace':
+                        messages.addMessage('Found a valid file geodatabase: ' + filename + ', item: ' + item )
+                        return item
+                except:
+                    messages.addErrorMessage('You did not select a valid file geodatabase: ' + filename)
+
+            else:
+                messages.addErrorMessage('You did not select a valid schema: ' + item)
+                sys.exit()
 
         if not delineate and not basin_params:
             messages.addWarningMessage('Nothing to do.  Make sure you select at least one checkbox')
@@ -398,14 +455,14 @@ class basinTools(object):
         if delineate == 'true' or basin_params == 'true':
             if input_basin and arcpy.Exists(input_basin):  
                 messages.addMessage('Delineated basin already exists. Skipping delineation process')
-            else:
+            elif output_basin:
                 messages.addMessage('Delineating Basin')
-                if not pourpoint:
-                    messages.addErrorMessage('Delineation needs a pourpoint')
-                    sys.exit()
+                schemaCheck = validateSchema(schema_file)
+                xmlCheck = validateXML(xml_file)
+                ppoint = validatePourPoint(pourpoint)
                 try:
-                    ssdel = Delineation(stabbr, schema_file, xml_file, workspaceID)
-                    ppoint = ssdel._buildAHPourpoint(pourpoint, pourpointwkid)
+                    ssdel = Delineation(stabbr, schemaCheck, xmlCheck, workspaceID)
+                    ppoint = ssdel._buildAHPourpoint(ppoint, pourpointwkid)
                     ssdel.Delineate(ppoint)
                     
 
@@ -423,6 +480,9 @@ class basinTools(object):
 
                 finally:
                     print "Results="+json.dumps(Results) 
+            else:
+                messages.addErrorMessage('No basin was given.  Make sure to give either an input or output basin.')
+                sys.exit()
 
             if not basin_params or basin_params != 'true':
                 Output_location = os.path.dirname(output_basin)
