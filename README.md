@@ -5,6 +5,10 @@ A collection of tools for StreamStats data preparation and upload to AWS
 
 [Python](https://www.python.org/downloads/)
 
+[Archydro](http://downloads.esri.com/archydro/archydro/)
+
+ArcGIS 10.5.1
+
 ## Getting Started 
 
 ### AWS CLI

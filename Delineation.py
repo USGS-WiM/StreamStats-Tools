@@ -75,9 +75,10 @@ class Delineation(object):
             self.__sm__("Template spatial ref: "+ sr.name)
 
             self.__sm__("Delineation Started") 
-            datasetPath = os.path.join(self.__WorkspaceDirectory__, self.WorkspaceID + '.gdb')[0]
-            featurePath = os.path.join(datasetPath,'Layers')[0]
+            datasetPath = os.path.join(self.__WorkspaceDirectory__, self.WorkspaceID + '.gdb')
+            featurePath = os.path.join(datasetPath,'Layers')
             if not arcpy.Exists(datasetPath):
+                self.__sm__("datasetPath: " + datasetPath)
                 datasetPath = arcpy.CreateFileGDB_management(self.__WorkspaceDirectory__, self.WorkspaceID +'.gdb')[0]
             if not arcpy.Exists(featurePath):
                 featurePath = arcpy.CreateFeatureDataset_management(datasetPath,'Layers', sr)[0]
