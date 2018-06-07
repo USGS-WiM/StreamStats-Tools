@@ -93,6 +93,7 @@ class updateS3Bucket(object):
             print 'Secrets file successfully imported'
             aws_access_key_id = secrets.aws_access_key_id
             aws_secret_access_key = secrets.aws_secret_access_key
+            user_name = secrets.name
 
             #apply keys as environment variables
             #https://stackoverflow.com/questions/36339975/how-to-automate-the-configuring-the-aws-command-line-interface-and-setting-up-pr
@@ -178,7 +179,7 @@ class updateS3Bucket(object):
             #create AWS CLI command
             cmd="aws s3 cp " + source + " " + destination +  " " + args
 
-            messages.addMessage('Copying ' + source + ' to amazon s3...')
+            messages.addMessage('Copying ' + source + ' to ' + destination + '...')
             messages.addMessage(cmd)
 
             try:
@@ -209,6 +210,9 @@ class updateS3Bucket(object):
             for folder in state_folders:
                 state = os.path.basename(os.path.normpath(folder))
                 messages.addMessage('Processing: ' + state)
+                logName = 'UpdateBucket.log'
+                logdirName = os.path.join(folder, 'log')
+                logdir = os.path.join(logdirName, logName)
 
                 if not copy_archydro and not copy_bc_layers:
                     messages.addWarningMessage('Nothing to do.  Make sure you select at least one "Copy" checkbox')
@@ -221,6 +225,22 @@ class updateS3Bucket(object):
                 if copy_bc_layers == 'true' and validateStreamStatsDataFolder(folder, 'bc_layers'):
                     messages.addMessage('Copying bc_layers folder for: ' + state)
                     copyToS3(folder + '/bc_layers',destinationBucket + '/data/' + state + '/bc_layers', '--recursive')
+
+                try:
+                    messages.addMessage('Attempting log pull')
+                    destFile = destinationBucket + '/data/' + state + '/log/' + logName
+                    if arcpy.Exists(destFile):
+                        copyToS3(destFile, logdir, '--recursive')
+                    if not arcpy.Exists(logdir):
+                        messages.addMessage('No log found, creating file')
+                        os.makedirs(logdirName)
+                        logging.basicConfig(filename=logdir, format ='%(asctime)s %(message)s', level=logging.DEBUG)
+                except:
+                    messages.addMessage('log pull failed')
+                if arcpy.Exists(logdir):
+                    logging.info(user_name)
+                    copyToS3(logdirName, destinationBucket + '/data/' + state + '/log', '--recursive')
+
 
         #check for xml file input
         if xml_files:
