@@ -87,6 +87,7 @@ class updateS3Bucket(object):
         xml_files      = parameters[3].valueAsText
         schema_files   = parameters[4].valueAsText
         
+        arcpy.env.overwriteOutput = True
 
         try:
             import secrets
@@ -168,9 +169,9 @@ class updateS3Bucket(object):
             else:
                 messages.addWarningMessage('Subfolder does not exist: ' + subfolder)
 
-        def copyToS3(source=None,destination=None,args=None):
-            """copyToS3(source=None,destination=None,args=None)
-                Function to call AWS CLI tools copy source file or folder to s3 with error trapping
+        def copyS3(source=None,destination=None,args=None):
+            """copyS3(source=None,destination=None,args=None)
+                Function to call AWS CLI tools copy source file or folder to and from s3 with error trapping
             """
 
             if args == None:
@@ -193,6 +194,53 @@ class updateS3Bucket(object):
             else:
                 messages.addMessage('Finished copying')
 
+        def checkS3Bucket(fileLocation=None):
+            """checkS3Bucket(fileLocation=None)
+                function to check for existence of log file in s3 bucket
+            """
+
+            cmd = "aws s3 ls " + fileLocation + " | wc -l"
+            try:
+                output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
+                if '0' in output:
+                    return 'False'
+                else:
+                    return 'True'
+
+            except subprocess.CalledProcessError as e:
+                messages.addErrorMessage(e.output)
+                tb = traceback.format_exc()
+                messages.addErrorMessage(tb)
+                sys.exit()
+            else:
+                messages.addMessage('Received list of elements in bucket')
+
+        def createLocalDataLog():
+            messages.addMessage('Starting log pull')
+            destFolder = 's3://streamstats-staged-data/KJ/dataLog'
+            destFile = destFolder + '/UpdateS3Bucket.log'
+            logFolder = 'C:/dataLog'
+            logdir = os.path.join(logFolder, 'UpdateS3Bucket.log')
+            if checkS3Bucket(destFile) == 'True':
+                messages.addMessage('Log file found in s3, copying to folder')
+                copyS3(destFolder, logFolder, '--recursive')
+                logging.basicConfig(filename=logdir, format ='%(asctime)s %(message)s', level=logging.DEBUG)
+            if not arcpy.Exists(logdir):
+                messages.addMessage('No log found, creating file')
+                os.makedirs(logFolder)
+                logging.basicConfig(filename=logdir, format ='%(asctime)s %(message)s', level=logging.DEBUG)
+        def logData(state=None):
+            try:
+                logging.info('Region: ' + state + '; User: ' + user_name)
+            except:
+                messages.addMessage('logging failed')
+            finally:
+                logging.shutdown()
+                logFolder = 'C:/dataLog'
+                logdir = os.path.join(logFolder, 'UpdateS3Bucket.log')
+                del logdir
+                del logFolder
+
         #start main program
         destinationBucket = 's3://streamstats-staged-data/KJ'
 
@@ -206,40 +254,27 @@ class updateS3Bucket(object):
 
             state_folders = state_folders.split(';')
 
+            createLocalDataLog()
+            
             #first process folders
             for folder in state_folders:
                 state = os.path.basename(os.path.normpath(folder))
                 messages.addMessage('Processing: ' + state)
-                logName = 'UpdateBucket.log'
-                logdirName = os.path.join(folder, 'log')
-                logdir = os.path.join(logdirName, logName)
-
+                
                 if not copy_archydro and not copy_bc_layers:
                     messages.addWarningMessage('Nothing to do.  Make sure you select at least one "Copy" checkbox')
                     sys.exit()
 
                 if copy_archydro == 'true' and validateStreamStatsDataFolder(folder, 'archydro'):
                     messages.addMessage('Copying archydro folder for: ' + state)
-                    copyToS3(folder + '/archydro',destinationBucket + '/data/' + state + '/archydro', '--recursive')
+                    copyS3(folder + '/archydro',destinationBucket + '/data/' + state + '/archydro', '--recursive')
 
                 if copy_bc_layers == 'true' and validateStreamStatsDataFolder(folder, 'bc_layers'):
                     messages.addMessage('Copying bc_layers folder for: ' + state)
-                    copyToS3(folder + '/bc_layers',destinationBucket + '/data/' + state + '/bc_layers', '--recursive')
-
-                try:
-                    messages.addMessage('Attempting log pull')
-                    destFile = destinationBucket + '/data/' + state + '/log/' + logName
-                    if arcpy.Exists(destFile):
-                        copyToS3(destFile, logdir, '--recursive')
-                    if not arcpy.Exists(logdir):
-                        messages.addMessage('No log found, creating file')
-                        os.makedirs(logdirName)
-                        logging.basicConfig(filename=logdir, format ='%(asctime)s %(message)s', level=logging.DEBUG)
-                except:
-                    messages.addMessage('log pull failed')
-                if arcpy.Exists(logdir):
-                    logging.info(user_name)
-                    copyToS3(logdirName, destinationBucket + '/data/' + state + '/log', '--recursive')
+                    copyS3(folder + '/bc_layers',destinationBucket + '/data/' + state + '/bc_layers', '--recursive')
+                
+                logData(state)
+            copyS3('C:/dataLog', destinationBucket + '/dataLog', '--recursive')
 
 
         #check for xml file input
@@ -252,7 +287,7 @@ class updateS3Bucket(object):
 
                 if validateStreamStatsXML(xml) == True:
                     filename = xml.replace('\\','/').split('/')[-1]
-                    copyToS3(xml, destinationBucket + '/xml/' + filename, '')
+                    copyS3(xml, destinationBucket + '/xml/' + filename, '')
 
         #check for schema file input
         if schema_files:
@@ -267,9 +302,9 @@ class updateS3Bucket(object):
                 rootname = schema.replace('\\','/').split('/')[-1]
 
                 if schemaType == 'fgdb':
-                    copyToS3(schema, destinationBucket + '/schemas/' + rootname, '--recursive')
+                    copyS3(schema, destinationBucket + '/schemas/' + rootname, '--recursive')
                 if schemaType == 'prj':
-                    copyToS3(schema, destinationBucket + '/schemas/' + rootname)
+                    copyS3(schema, destinationBucket + '/schemas/' + rootname)
                      
   
 
