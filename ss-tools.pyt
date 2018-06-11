@@ -22,6 +22,14 @@ class updateS3Bucket(object):
     def getParameterInfo(self):
         #Define parameter definitions
 
+        workspaceID = arcpy.Parameter(
+            displayName="Select temporary workspace folder for data log",
+            name="workspaceID",
+            datatype="DEFolder",
+            parameterType="Required",
+            direction="Input"
+        )
+        
         state_folders = arcpy.Parameter(
             displayName="Select input state/region folder",
             name="state_folders",
@@ -60,7 +68,7 @@ class updateS3Bucket(object):
             direction="Input",
             multiValue=True)
         
-        parameters = [state_folders, copy_archydro, copy_bc_layers, xml_files, schema_files]
+        parameters = [workspaceID, state_folders, copy_archydro, copy_bc_layers, xml_files, schema_files]
     
         return parameters
 
@@ -81,11 +89,12 @@ class updateS3Bucket(object):
         return
 
     def execute(self, parameters, messages):
-        state_folders  = parameters[0].valueAsText
-        copy_archydro  = parameters[1].valueAsText
-        copy_bc_layers = parameters[2].valueAsText
-        xml_files      = parameters[3].valueAsText
-        schema_files   = parameters[4].valueAsText
+        workspaceID    = parameters[0].valueAsText
+        state_folders  = parameters[1].valueAsText
+        copy_archydro  = parameters[2].valueAsText
+        copy_bc_layers = parameters[3].valueAsText
+        xml_files      = parameters[4].valueAsText
+        schema_files   = parameters[5].valueAsText
         
         arcpy.env.overwriteOutput = True
 
@@ -216,11 +225,11 @@ class updateS3Bucket(object):
                 messages.addMessage('Received list of elements in bucket')
 
         def createLocalDataLog():
+            logFolder = os.path.join(workspaceID, 'dataLog')
+            logdir = os.path.join(logFolder, 'UpdateS3Bucket.log')
             messages.addMessage('Starting log pull')
             destFolder = 's3://streamstats-staged-data/KJ/dataLog'
             destFile = destFolder + '/UpdateS3Bucket.log'
-            logFolder = 'C:/dataLog'
-            logdir = os.path.join(logFolder, 'UpdateS3Bucket.log')
             if checkS3Bucket(destFile) == 'True':
                 messages.addMessage('Log file found in s3, copying to folder')
                 copyS3(destFolder, logFolder, '--recursive')
@@ -230,14 +239,14 @@ class updateS3Bucket(object):
                 os.makedirs(logFolder)
                 logging.basicConfig(filename=logdir, format ='%(asctime)s %(message)s', level=logging.DEBUG)
         def logData(state=None):
+            logFolder = os.path.join(workspaceID, 'dataLog')
+            logdir = os.path.join(logFolder, 'UpdateS3Bucket.log')
             try:
                 logging.info('Region: ' + state + '; User: ' + user_name)
             except:
                 messages.addMessage('logging failed')
             finally:
                 logging.shutdown()
-                logFolder = 'C:/dataLog'
-                logdir = os.path.join(logFolder, 'UpdateS3Bucket.log')
                 del logdir
                 del logFolder
 
@@ -255,7 +264,9 @@ class updateS3Bucket(object):
             state_folders = state_folders.split(';')
 
             createLocalDataLog()
-            
+            logFolder = os.path.join(workspaceID, 'dataLog')
+            logdir = os.path.join(logFolder, 'UpdateS3Bucket.log')
+
             #first process folders
             for folder in state_folders:
                 state = os.path.basename(os.path.normpath(folder))
@@ -274,7 +285,7 @@ class updateS3Bucket(object):
                     copyS3(folder + '/bc_layers',destinationBucket + '/data/' + state + '/bc_layers', '--recursive')
                 
                 logData(state)
-            copyS3('C:/dataLog', destinationBucket + '/dataLog', '--recursive')
+            copyS3(logFolder, destinationBucket + '/dataLog', '--recursive')
 
 
         #check for xml file input
