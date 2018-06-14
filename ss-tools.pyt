@@ -22,29 +22,41 @@ class updateS3Bucket(object):
     def getParameterInfo(self):
         #Define parameter definitions
 
-        workspaceID = arcpy.Parameter(
-            displayName="Select temporary workspace folder for data log",
-            name="workspaceID",
-            datatype="DEFolder",
+        log_Note = arcpy.Parameter(
+            displayName = "Describe changes made in this update (limit 50 chars)",
+            name = "log_Note",
+            datatype="GPString",
             parameterType="Required",
-            direction="Input"
-        )
-        
-        state_folders = arcpy.Parameter(
-            displayName="Select input state/region folder",
-            name="state_folders",
-            datatype="DEFolder",
-            parameterType="Optional",
-            direction="Input",
-            multiValue=True)
-
-        copy_archydro = arcpy.Parameter(
-            displayName="Copy 'archydro' folder",
-            name="copy_data_archydro",
-            datatype="GPBoolean",
-            parameterType="Optional",
             direction="Input")
 
+        access_key = arcpy.Parameter(
+            displayName="Your aws access key",
+            name="access_key",
+            datatype="GPString",
+            parameterType="Required",
+            direction="Input")
+
+        access_key_id = arcpy.Parameter(
+            displayName="Your aws access key ID",
+            name="access_key_id",
+            datatype="GPString",
+            parameterType="Required",
+            direction="Input")
+
+        editor_name = arcpy.Parameter(
+            displayName="Your name",
+            name="editor_name",
+            datatype="GPString",
+            parameterType="Required",
+            direction="Input")
+        
+        state_folder = arcpy.Parameter(
+            displayName="Select input state/region folder",
+            name="state_folder",
+            datatype="DEFolder",
+            parameterType="Optional",
+            direction="Input")
+        
         copy_bc_layers = arcpy.Parameter(
             displayName="Copy 'bc_layers' folder",
             name="copy_data_bc_layers",
@@ -52,23 +64,44 @@ class updateS3Bucket(object):
             parameterType="Optional",
             direction="Input")
 
-        xml_files = arcpy.Parameter(
-            displayName="Select input xml",
+        copy_archydro = arcpy.Parameter(
+            displayName="Copy entire 'archydro' folder",
+            name="copy_data_archydro",
+            datatype="GPBoolean",
+            parameterType="Optional",
+            direction="Input")
+
+        copy_global = arcpy.Parameter(
+            displayName="Copy 'global.gdb' folder",
+            name="copy_global",
+            datatype="GPBoolean",
+            parameterType="Optional",
+            direction="Input")
+        
+        huc_folders = arcpy.Parameter(
+            displayName="Input huc folders",
+            name="huc_folders",
+            datatype=["DEFolder", "GPString"],
+            parameterType="Optional",
+            direction="Input",
+            multiValue="True")
+
+        xml_file = arcpy.Parameter(
+            displayName="Select xml file",
             name="xml_files",
             datatype="DEFile",
             parameterType="Optional",
-            direction="Input",
-            multiValue=True)
+            direction="Input")
 
-        schema_files = arcpy.Parameter(
-            displayName="Select input schema FGDB or PRJ file",
+        schema_file = arcpy.Parameter(
+            displayName="Select schema FGDB or PRJ file",
             name="schema_files",
             datatype="DEType",
             parameterType="Optional",
             direction="Input",
-            multiValue=True)
+            multiValue="True")
         
-        parameters = [workspaceID, state_folders, copy_archydro, copy_bc_layers, xml_files, schema_files]
+        parameters = [log_Note, access_key, access_key_id, editor_name, state_folder, copy_bc_layers, copy_archydro, copy_global, huc_folders, xml_file, schema_file]
     
         return parameters
 
@@ -86,24 +119,35 @@ class updateS3Bucket(object):
         return
 
     def updateMessages(self, parameters): #optional
+        if parameters[1].altered:
+            logNote = parameters[1].valueAsText
+            if len(logNote) > 50:
+                pythonaddins.MessageBox('Note cannot exceed 50 characters', 'WARNING', 0)
+        if not parameters[8].altered:
+            parameters[8].value = ''
+        if parameters[7].value == True or parameters[8].valueAsText:
+            parameters[6].value = False
         return
 
     def execute(self, parameters, messages):
-        workspaceID    = parameters[0].valueAsText
-        state_folders  = parameters[1].valueAsText
-        copy_archydro  = parameters[2].valueAsText
-        copy_bc_layers = parameters[3].valueAsText
-        xml_files      = parameters[4].valueAsText
-        schema_files   = parameters[5].valueAsText
+        logNote        = parameters[0].valueAsText
+        accessKey      = parameters[1].valueAsText
+        accessKeyID    = parameters[2].valueAsText
+        editorName     = parameters[3].valueAsText
+        state_folder   = parameters[4].valueAsText
+        copy_bc_layers = parameters[5].valueAsText
+        copy_archydro  = parameters[6].valueAsText
+        copy_global    = parameters[7].valueAsText
+        huc_folders    = parameters[8].valueAsText
+        xml_file       = parameters[9].valueAsText
+        schema_file    = parameters[10].valueAsText
         
         arcpy.env.overwriteOutput = True
 
         try:
-            import secrets
-            print 'Secrets file successfully imported'
-            aws_access_key_id = secrets.aws_access_key_id
-            aws_secret_access_key = secrets.aws_secret_access_key
-            user_name = secrets.name
+            aws_access_key_id = accessKeyID
+            aws_secret_access_key = accessKey
+            user_name = editorName
 
             #apply keys as environment variables
             #https://stackoverflow.com/questions/36339975/how-to-automate-the-configuring-the-aws-command-line-interface-and-setting-up-pr
@@ -111,7 +155,7 @@ class updateS3Bucket(object):
             os.environ['aws_secret_access_key'] = aws_secret_access_key
 
         except ImportError:
-            messages.addErrorMessage('Secrets file not found')
+            messages.addErrorMessage('Error using aws credentials')
             sys.exit()
 
         def validateStreamStatsXML(xml):
@@ -167,7 +211,7 @@ class updateS3Bucket(object):
                 Determines if input state/region data folder is valid
             """
 
-            state = os.path.basename(os.path.normpath(folder))
+            state = os.path.basename(folder)
 
             #validate state
             if state.upper() not in states:
@@ -177,7 +221,7 @@ class updateS3Bucket(object):
                 return True
             else:
                 messages.addWarningMessage('Subfolder does not exist: ' + subfolder)
-
+        
         def copyS3(source=None,destination=None,args=None):
             """copyS3(source=None,destination=None,args=None)
                 Function to call AWS CLI tools copy source file or folder to and from s3 with error trapping
@@ -224,31 +268,32 @@ class updateS3Bucket(object):
             else:
                 messages.addMessage('Received list of elements in bucket')
 
-        def createLocalDataLog():
-            logFolder = os.path.join(workspaceID, 'dataLog')
-            logdir = os.path.join(logFolder, 'UpdateS3Bucket.log')
+        def logData(folder=None,state=None):
+            logFolder = folder
+            logdir = os.path.join(logFolder, state + 'log.txt')
+            destFolder = 's3://streamstats-staged-data/KJ/' + state
+            destFile = destFolder + '/' + state + 'log.txt'
+
             messages.addMessage('Starting log pull')
-            destFolder = 's3://streamstats-staged-data/KJ/dataLog'
-            destFile = destFolder + '/UpdateS3Bucket.log'
             if checkS3Bucket(destFile) == 'True':
                 messages.addMessage('Log file found in s3, copying to folder')
-                copyS3(destFolder, logFolder, '--recursive')
-                logging.basicConfig(filename=logdir, format ='%(asctime)s %(message)s', level=logging.DEBUG)
-            if not arcpy.Exists(logdir):
+                copyS3(destFile, logdir, '--recursive')
+            else:
                 messages.addMessage('No log found, creating file')
-                os.makedirs(logFolder)
-                logging.basicConfig(filename=logdir, format ='%(asctime)s %(message)s', level=logging.DEBUG)
-        def logData(state=None):
-            logFolder = os.path.join(workspaceID, 'dataLog')
-            logdir = os.path.join(logFolder, 'UpdateS3Bucket.log')
-            try:
-                logging.info('Region: ' + state + '; User: ' + user_name)
-            except:
-                messages.addMessage('logging failed')
-            finally:
-                logging.shutdown()
-                del logdir
-                del logFolder
+                if not arcpy.Exists(logdir):
+                    os.makedirs(logdir)
+
+            formatter = logging.Formatter('%(asctime)s %(message)s')
+            handler = logging.FileHandler(logdir)
+            handler.setFormatter(formatter)
+            logger = logging.getLogger(state + 'log')
+            logger.setLevel(logging.INFO)
+            logger.addHandler(handler)
+            logger.info('Region: ' + state + '; User: ' + user_name + '; Note: ' + logNote)
+
+            logging.shutdown()
+            del logdir
+            del logFolder
 
         #start main program
         destinationBucket = 's3://streamstats-staged-data/KJ'
@@ -258,66 +303,67 @@ class updateS3Bucket(object):
         messages.addGPMessages()
         
         #check for state folder input
-        if state_folders:
-            messages.addMessage('Folder list: ' + state_folders)
+        if (copy_archydro or copy_bc_layers or copy_global or huc_folders) and not state_folder:
+            messages.addWarningMessage('Make sure you input a state folder, then try again.')
+            sys.exit()
+        if state_folder:
+            messages.addMessage('Folder: ' + state_folder)
 
-            state_folders = state_folders.split(';')
-
-            createLocalDataLog()
-            logFolder = os.path.join(workspaceID, 'dataLog')
-            logdir = os.path.join(logFolder, 'UpdateS3Bucket.log')
-
-            #first process folders
-            for folder in state_folders:
-                state = os.path.basename(os.path.normpath(folder))
-                messages.addMessage('Processing: ' + state)
+            state = os.path.basename(state_folder)
+            messages.addMessage('Processing: ' + state)
                 
-                if not copy_archydro and not copy_bc_layers:
-                    messages.addWarningMessage('Nothing to do.  Make sure you select at least one "Copy" checkbox')
-                    sys.exit()
+            if not copy_archydro and not copy_bc_layers and not copy_global and not huc_folders:
+                messages.addWarningMessage('Nothing to do.  Make sure you select at least one "Copy" checkbox')
+                sys.exit()
 
-                if copy_archydro == 'true' and validateStreamStatsDataFolder(folder, 'archydro'):
-                    messages.addMessage('Copying archydro folder for: ' + state)
-                    copyS3(folder + '/archydro',destinationBucket + '/data/' + state + '/archydro', '--recursive')
+            if copy_archydro == 'true' and validateStreamStatsDataFolder(state_folder, 'archydro'):
+                messages.addMessage('Copying archydro folder for: ' + state)
+                copyS3(state_folder + '/archydro',destinationBucket + '/' + state + '/archydro', '--recursive')
 
-                if copy_bc_layers == 'true' and validateStreamStatsDataFolder(folder, 'bc_layers'):
-                    messages.addMessage('Copying bc_layers folder for: ' + state)
-                    copyS3(folder + '/bc_layers',destinationBucket + '/data/' + state + '/bc_layers', '--recursive')
-                
-                logData(state)
-            copyS3(logFolder, destinationBucket + '/dataLog', '--recursive')
+            if copy_bc_layers == 'true' and validateStreamStatsDataFolder(state_folder, 'bc_layers'):
+                messages.addMessage('Copying bc_layers folder for: ' + state)
+                copyS3(state_folder + '/bc_layers',destinationBucket + '/' + state + '/bc_layers', '--recursive')
 
+            global_gdb = os.path.join(state_folder, 'archydro', 'global.gdb')
+            if copy_global and os.path.isdir(global_gdb):
+                messages.addMessage('Copying global.gdb')
+                copyS3(global_gdb, destinationBucket + '/' + state + '/archydro/global.gdb', '--recursive')
+            if huc_folders:
+                huc_folders = huc_folders.split(';')
+                for huc_folder in huc_folders:
+                    if '/' in huc_folder: #not the best way to do it
+                        huc_folder = huc_folder
+                    else:
+                        huc_folder = os.path.join(state_folder,'archydro', huc_folder)
+                    if os.path.isdir(huc_folder):
+                        huc_id = os.path.basename(huc_folder)
+                        copyS3(huc_folder, destinationBucket + '/' + state + '/archydro/' + huc_id, '--recursive')
+                    else:
+                        messages.addMessage('Huc folder not found: ' + huc_id)
 
         #check for xml file input
-        if xml_files:
-            xml_files = xml_files.split(';')
-
-            #first process folders
-            for xml in xml_files:
-                messages.addMessage('Now processing xml: ' + xml)
-
-                if validateStreamStatsXML(xml) == True:
-                    filename = xml.replace('\\','/').split('/')[-1]
-                    copyS3(xml, destinationBucket + '/xml/' + filename, '')
+        if xml_file:
+            messages.addMessage('Now processing xml')
+            if arcpy.Exists(xml_file):
+                filename = xml_file.replace('\\','/').split('/')[-1]
+                copyS3(xml_file, destinationBucket + '/' + state + '/' + filename, '')
+            else:
+                messages.addWarningMessage("There is no valid .xml file.  File should be named 'Streamstats" + state + ".xml'.")
+                sys.exit()
 
         #check for schema file input
-        if schema_files:
-            schema_files = schema_files.split(';')
+        if schema_file:
+            messages.addMessage('Now processing schema')
+            schemaType = vallidateStreamStatsSchema(schema_file)
+            rootname = schema.replace('\\','/').split('/')[-1]
 
-            #first process folders
-            for schema in schema_files:
+            if schemaType == 'fgdb':
+                copyS3(schema, destinationBucket + '/schemas/' + rootname, '--recursive')
+            if schemaType == 'prj':
+                copyS3(schema, destinationBucket + '/schemas/' + rootname)
 
-                messages.addMessage('Now processing schema: ' + schema)
-
-                schemaType = validateStreamStatsSchema(schema)
-                rootname = schema.replace('\\','/').split('/')[-1]
-
-                if schemaType == 'fgdb':
-                    copyS3(schema, destinationBucket + '/schemas/' + rootname, '--recursive')
-                if schemaType == 'prj':
-                    copyS3(schema, destinationBucket + '/schemas/' + rootname)
-                     
-  
+            
+            logData(state_folder,state)
 
 class basinDelin(object):
     # region Constructor
