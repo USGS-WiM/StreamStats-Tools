@@ -374,10 +374,10 @@ class basinDelin(object):
     def getParameterInfo(self):
         # Define parameter definitions
 
-        stabbr = arcpy.Parameter(
-            displayName="Abbreviated region name",
-            name="stabbr",
-            datatype="GPString",
+        state_folder = arcpy.Parameter(
+            displayName="Select input state/region folder",
+            name="state_folder",
+            datatype="DEType",
             parameterType="Required",
             direction="Input")
 
@@ -438,7 +438,7 @@ class basinDelin(object):
             direction="Input")
 
 
-        parameters = [stabbr, schema_file, xml_file, workspaceID, pourpoint, pourpointwkid, output_basin, basin_params, parameters_list] 
+        parameters = [state_folder, schema_file, xml_file, workspaceID, pourpoint, pourpointwkid, output_basin, basin_params, parameters_list] 
         return parameters
     
     def isLicensed(self):
@@ -463,7 +463,7 @@ class basinDelin(object):
         return
 
     def execute(self, parameters, messages): 
-        stabbr          = parameters[0].valueAsText
+        state_folder    = parameters[0].valueAsText
         schema_file     = parameters[1].valueAsText
         xml_file        = parameters[2].valueAsText
         workspaceID     = parameters[3].valueAsText
@@ -474,6 +474,8 @@ class basinDelin(object):
         parameters_list = parameters[8].valueAsText
 
         arcpy.env.overwriteOutput = True
+
+        stabbr = os.path.basename(state_folder)
 
         Results = {}
         workspace_name = os.path.basename(workspaceID)
@@ -545,7 +547,7 @@ class basinDelin(object):
         xmlCheck = validateXML(xml_file)
         ppoint = validatePourPoint(pourpoint)
         try:
-            ssdel = Delineation(stabbr, schemaCheck, xmlCheck, workspaceID)
+            ssdel = Delineation(stabbr, schemaCheck, xmlCheck, workspaceID, state_folder)
             ppoint = ssdel._buildAHPourpoint(ppoint, pourpointwkid)
             ssdel.Delineate(ppoint)
             

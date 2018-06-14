@@ -36,11 +36,12 @@ import xml.dom.minidom
 
 class Delineation(object):
     #region Constructor
-    def __init__(self, regionID, schemas, xml, workspaceID):
+    def __init__(self, regionID, schemas, xml, workspaceID, state_folder):
         self.Message =""
         self.__schemaPath__ = schemas
         self.__xmlPath__ = xml
         self.__regionID__ = regionID       
+        self.__dataFolder__ = state_folder
         self.__templatePath__ = os.path.join(self.__schemaPath__,"Layers")
         self.WorkspaceID = os.path.basename(workspaceID)
         self.__WorkspaceDirectory__ = self.__getDirectory__(workspaceID)
@@ -156,6 +157,15 @@ class Delineation(object):
 
             #update tempworkspace
             xmlDoc = xml.dom.minidom.parse(xmlFile)
+            archydroPath = os.path.join(self.__dataFolder__, 'archydro')
+            bcLayersPath = os.path.join(self.__dataFolder__, 'bc_layers')
+            xmlDoc.getElementsByTagName('RASTERDATAPATH')[0].firstChild.data = bcLayersPath
+            xmlDoc.getElementsByTagName('VECTORDATAPATH')[0].firstChild.data = os.path.join(archydroPath,"global.gdb")
+            xmlDoc.getElementsByTagName('RasterLocation')[0].firstChild.data = archydroPath
+            xmlDoc.getElementsByTagName('VectorLocation')[0].firstChild.data = os.path.join(archydroPath,"global.gdb")
+            xmlDoc.getElementsByTagName('DataPath')[0].firstChild.data = archydroPath
+            xmlDoc.getElementsByTagName('GlobalDataPath')[0].firstChild.data = os.path.join(archydroPath,"global.gdb")
+
             xmlDoc.getElementsByTagName('TempLocation')[0].firstChild.data = newTempWorkspace
             file = open(xmlFile,"wb")
             xmlDoc.writexml(file)
