@@ -76,7 +76,8 @@ class BasinParameters(object):
             xmlfile = self.__SSXMLPath__("StreamStats{0}.xml".format(self.RegionID), self.__TempLocation__)
            
             if parameters == '':
-                parameters = self.__allParams__(xmlfile)
+                parametersList = self.__allParams__(xmlfile)
+                parameters = seperator.join(parametersList)
                 self.__sm__('parameters list length: ' + str(len(parameters)))
 
             arcpy.CheckOutExtension("Spatial")

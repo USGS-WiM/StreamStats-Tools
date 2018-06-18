@@ -96,7 +96,7 @@ class Delineation(object):
             arcpy.CheckOutExtension("Spatial")
             self.__sm__("Starting Delineation")
 
-            ArcHydroTools.StreamstatsGlobalWatershedDelineation(PourPoint, GW, GWP, xmlPath , "CLEARFEATURES_NO", self.WorkspaceID)
+            ArcHydroTools.StreamstatsGlobalWatershedDelineation(PourPoint, GW, GWP, xmlPath , "CLEARFEATURES_NO", self.WorkspaceID + '.gdb')
             self.__sm__(arcpy.GetMessages(),'AHMSG')
 
             #remove holes  

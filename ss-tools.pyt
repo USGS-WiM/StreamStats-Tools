@@ -378,7 +378,7 @@ class updateS3Bucket(object):
             state = rootname.split('_ss.gdb')[0].upper()
 
             if schemaType == 'fgdb':
-                copyS3(schema, destinationBucket + '/' + state + '/' + rootname, '--recursive')
+                copyS3(schema_file, destinationBucket + '/' + state + '/' + rootname, '--recursive')
 
             
         logData(state_folder,state)
@@ -400,7 +400,7 @@ class basinDelin(object):
             direction="Input")
 
         schema_file = arcpy.Parameter(
-            displayName="Regional schema FGDB or PRJ file",
+            displayName="Regional schema FGDB file",
             name="schema_file",
             datatype="DEType",
             parameterType="Required",
