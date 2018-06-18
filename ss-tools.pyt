@@ -29,16 +29,16 @@ class updateS3Bucket(object):
             parameterType="Required",
             direction="Input")
 
-        access_key = arcpy.Parameter(
-            displayName="Your aws access key",
-            name="access_key",
+        access_key_id = arcpy.Parameter(
+            displayName="Your AWS Access Key ID",
+            name="access_key_id",
             datatype="GPString",
             parameterType="Required",
             direction="Input")
 
-        access_key_id = arcpy.Parameter(
-            displayName="Your aws access key ID",
-            name="access_key_id",
+        access_key = arcpy.Parameter(
+            displayName="Your AWS Secret Access Key",
+            name="access_key",
             datatype="GPString",
             parameterType="Required",
             direction="Input")
@@ -54,7 +54,7 @@ class updateS3Bucket(object):
             displayName="Select input state/region folder",
             name="state_folder",
             datatype="DEFolder",
-            parameterType="Optional",
+            parameterType="Required",
             direction="Input")
         
         copy_bc_layers = arcpy.Parameter(
@@ -100,7 +100,7 @@ class updateS3Bucket(object):
             parameterType="Optional",
             direction="Input")
         
-        parameters = [log_Note, access_key, access_key_id, editor_name, state_folder, copy_bc_layers, copy_archydro, copy_global, huc_folders, xml_file, schema_file]
+        parameters = [log_Note, access_key_id, access_key, editor_name, state_folder, copy_bc_layers, copy_archydro, copy_global, huc_folders, xml_file, schema_file]
     
         return parameters
 
@@ -130,8 +130,8 @@ class updateS3Bucket(object):
 
     def execute(self, parameters, messages):
         logNote        = parameters[0].valueAsText
-        accessKey      = parameters[1].valueAsText
-        accessKeyID    = parameters[2].valueAsText
+        accessKeyID    = parameters[1].valueAsText
+        accessKey      = parameters[2].valueAsText
         editorName     = parameters[3].valueAsText
         state_folder   = parameters[4].valueAsText
         copy_bc_layers = parameters[5].valueAsText
@@ -151,8 +151,6 @@ class updateS3Bucket(object):
             #create AWS CLI command
             cmd="aws configure set aws_access_key_id " + AWSKeyID
 
-            messages.addMessage('Configuring AWSKeyID ')
-            messages.addMessage(cmd)
 
             try:
                 output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
@@ -172,8 +170,6 @@ class updateS3Bucket(object):
             #create AWS CLI command
             cmd="aws configure set aws_secret_access_key " + AWSAccessKey
 
-            messages.addMessage('Configuring AWSKeyID ')
-            messages.addMessage(cmd)
 
             try:
                 output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
@@ -184,7 +180,7 @@ class updateS3Bucket(object):
                 messages.addErrorMessage(tb)
                 sys.exit()
             else:
-                messages.addMessage('Finished configuring AWS Key ID')
+                messages.addMessage('Finished configuring AWS Secret Access Key')
         def validateStreamStatsXML(xml):
             """validateStreamStatsXML(xml=None)
                 Determines if input xml is a valid streamstats XML file
@@ -251,7 +247,6 @@ class updateS3Bucket(object):
             cmd="aws s3 cp " + source + " " + destination +  " " + args
 
             messages.addMessage('Copying ' + source + ' to ' + destination + '...')
-            messages.addMessage(cmd)
 
             try:
                 output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
@@ -286,15 +281,14 @@ class updateS3Bucket(object):
                 messages.addMessage('Received list of elements in bucket')
 
         def logData(folder=None,state=None):
-            logFolder = folder
+            logFolder = os.path.join(folder, 'log')
             logdir = os.path.join(logFolder, state + 'log.txt')
-            destFolder = 's3://streamstats-staged-data/KJ/' + state
+            destFolder = 's3://streamstats-staged-data/KJ/' + state + '/log'
             destFile = destFolder + '/' + state + 'log.txt'
 
-            messages.addMessage('Starting log pull')
             if checkS3Bucket(destFile) == 'True':
                 messages.addMessage('Log file found in s3, copying to folder')
-                copyS3(destFile, logdir, '--recursive')
+                copyS3(destFolder, logFolder, '--recursive')
             else:
                 messages.addMessage('No log found, creating file')
                 if not arcpy.Exists(logdir):
@@ -307,6 +301,8 @@ class updateS3Bucket(object):
             logger.setLevel(logging.INFO)
             logger.addHandler(handler)
             logger.info('Region: ' + state + '; User: ' + user_name + '; Note: ' + logNote)
+
+            copyS3(logFolder, destFolder, '--recursive')
 
             logging.shutdown()
             del logdir
@@ -338,10 +334,6 @@ class updateS3Bucket(object):
             state = os.path.basename(state_folder)
             messages.addMessage('Processing: ' + state)
                 
-            if not copy_archydro and not copy_bc_layers and not copy_global and not huc_folders:
-                messages.addWarningMessage('Nothing to do.  Make sure you select at least one "Copy" checkbox')
-                sys.exit()
-
             if copy_archydro == 'true' and validateStreamStatsDataFolder(state_folder, 'archydro'):
                 messages.addMessage('Copying archydro folder for: ' + state)
                 copyS3(state_folder + '/archydro',destinationBucket + '/' + state + '/archydro', '--recursive')
@@ -383,12 +375,13 @@ class updateS3Bucket(object):
             messages.addMessage('Now processing schema')
             schemaType = validateStreamStatsSchema(schema_file)
             rootname = schema.replace('\\','/').split('/')[-1]
+            state = rootname.split('_ss.gdb')[0].upper()
 
             if schemaType == 'fgdb':
-                copyS3(schema, destinationBucket + '/schemas/' + rootname, '--recursive')
+                copyS3(schema, destinationBucket + '/' + state + '/' + rootname, '--recursive')
 
             
-            logData(state_folder,state)
+        logData(state_folder,state)
 
 class basinDelin(object):
     # region Constructor
