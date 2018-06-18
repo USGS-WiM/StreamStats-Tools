@@ -94,12 +94,11 @@ class updateS3Bucket(object):
             direction="Input")
 
         schema_file = arcpy.Parameter(
-            displayName="Select schema FGDB or PRJ file",
+            displayName="Select schema FGDB file",
             name="schema_files",
             datatype="DEType",
             parameterType="Optional",
-            direction="Input",
-            multiValue="True")
+            direction="Input")
         
         parameters = [log_Note, access_key, access_key_id, editor_name, state_folder, copy_bc_layers, copy_archydro, copy_global, huc_folders, xml_file, schema_file]
     
@@ -144,20 +143,48 @@ class updateS3Bucket(object):
         
         arcpy.env.overwriteOutput = True
 
-        try:
-            aws_access_key_id = accessKeyID
-            aws_secret_access_key = accessKey
-            user_name = editorName
+        def configureAWSKeyID(AWSKeyID):
+            """configureAWSKeyID(AWSKeyID=None)
+                Function to configure AWS Access Key ID
+            """
 
-            #apply keys as environment variables
-            #https://stackoverflow.com/questions/36339975/how-to-automate-the-configuring-the-aws-command-line-interface-and-setting-up-pr
-            os.environ['aws_access_key_id'] = aws_access_key_id
-            os.environ['aws_secret_access_key'] = aws_secret_access_key
+            #create AWS CLI command
+            cmd="aws configure set aws_access_key_id " + AWSKeyID
 
-        except ImportError:
-            messages.addErrorMessage('Error using aws credentials')
-            sys.exit()
+            messages.addMessage('Configuring AWSKeyID ')
+            messages.addMessage(cmd)
 
+            try:
+                output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
+            except subprocess.CalledProcessError as e:
+                #messages.addErrorMessage('Configure not successful.  Please make sure you have inserted the correct credentials.')
+                messages.addErrorMessage(e.output)
+                tb = traceback.format_exc()
+                messages.addErrorMessage(tb)
+                sys.exit()
+            else:
+                messages.addMessage('Finished configuring AWS Key ID')
+        def configureAWSKey(AWSAccessKey):
+            """configureAWSKey(AWSAccessKey=None)
+                Function to configure AWS CLI Access Key
+            """
+
+            #create AWS CLI command
+            cmd="aws configure set aws_secret_access_key " + AWSAccessKey
+
+            messages.addMessage('Configuring AWSKeyID ')
+            messages.addMessage(cmd)
+
+            try:
+                output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
+            except subprocess.CalledProcessError as e:
+                #messages.addErrorMessage('Configure not successful.  Please make sure you have entered the correct credentials.')
+                messages.addErrorMessage(e.output)
+                tb = traceback.format_exc()
+                messages.addErrorMessage(tb)
+                sys.exit()
+            else:
+                messages.addMessage('Finished configuring AWS Key ID')
         def validateStreamStatsXML(xml):
             """validateStreamStatsXML(xml=None)
                 Determines if input xml is a valid streamstats XML file
@@ -182,18 +209,8 @@ class updateS3Bucket(object):
 
             filename = item.replace('\\','/').split('/')[-1]
 
-            #validate prj file
-            if os.path.isfile(item) and fnmatch.fnmatch(filename, '*.prj'):
-                try:
-                    arcpy.SpatialReference(filename)
-                except:
-                    messages.addErrorMessage('You did not select a valid prj file: ' + filename)
-                else:
-                    messages.addMessage('Found a valid .prj file: ' + filename)
-                    return 'prj'
-
             #validate file gdb
-            elif os.path.isdir(item) and filename.find('gdb'):
+            if os.path.isdir(item) and filename.find('gdb'):
                 try:
                     desc = arcpy.Describe(item)
                     if desc.dataType == 'Workspace':
@@ -296,6 +313,15 @@ class updateS3Bucket(object):
             del logFolder
 
         #start main program
+        try:
+            configureAWSKeyID(accessKeyID)
+            configureAWSKey(accessKey)
+            user_name = editorName
+
+        except ImportError:
+            messages.addErrorMessage('Error using aws credentials')
+            sys.exit()
+
         destinationBucket = 's3://streamstats-staged-data/KJ'
 
         states = ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "CRB","DC", "DE", "DRB", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "RRB", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"]
@@ -344,8 +370,9 @@ class updateS3Bucket(object):
         #check for xml file input
         if xml_file:
             messages.addMessage('Now processing xml')
-            if arcpy.Exists(xml_file):
+            if arcpy.Exists(xml_file) and validateStreamStatsXML(xml_file):
                 filename = xml_file.replace('\\','/').split('/')[-1]
+                state = filename.split('.xml')[0].split('StreamStats')[1].upper()
                 copyS3(xml_file, destinationBucket + '/' + state + '/' + filename, '')
             else:
                 messages.addWarningMessage("There is no valid .xml file.  File should be named 'Streamstats" + state + ".xml'.")
@@ -354,13 +381,11 @@ class updateS3Bucket(object):
         #check for schema file input
         if schema_file:
             messages.addMessage('Now processing schema')
-            schemaType = vallidateStreamStatsSchema(schema_file)
+            schemaType = validateStreamStatsSchema(schema_file)
             rootname = schema.replace('\\','/').split('/')[-1]
 
             if schemaType == 'fgdb':
                 copyS3(schema, destinationBucket + '/schemas/' + rootname, '--recursive')
-            if schemaType == 'prj':
-                copyS3(schema, destinationBucket + '/schemas/' + rootname)
 
             
             logData(state_folder,state)
@@ -424,7 +449,7 @@ class basinDelin(object):
             direction="Output")
 
         basin_params = arcpy.Parameter(
-            displayName="Calculate Basin Characteristics",
+            displayName="Calculate All Basin Characteristics",
             name="basin_params",
             datatype="GPBoolean",
             parameterType="Optional",
@@ -578,7 +603,9 @@ class basinDelin(object):
                 arcpy.Delete_management(GWP_file)
 
 
-        if basin_params == 'true':
+        if basin_params == 'true' or parameters_list:
+            if not parameters_list:
+                parameters_list = ''
             try:
                 messages.addMessage('Calculating Basin Characteristics')
                 ssBp = BasinParameters(stabbr, workspaceID, parameters_list, "none")
@@ -633,7 +660,7 @@ class basinParams(object):
             displayName="Characteristics",
             name="parameters_list",
             datatype="GPString",
-            parameterType="Required",
+            parameterType="Optional",
             direction="Input")
         
         input_basin = arcpy.Parameter(
@@ -666,6 +693,8 @@ class basinParams(object):
 
         arcpy.env.overwriteOutput = True
 
+        if not parameters_list:
+            parameters_list = ''
         Results = {}
         workspace_name = os.path.basename(workspaceID)
         GW_location = os.path.join(workspaceID, workspace_name + '.gdb')

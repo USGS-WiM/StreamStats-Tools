@@ -28,6 +28,7 @@ import logging
 import ArcHydroTools
 import xml.dom.minidom
 from arcpy import env
+import xml.etree.ElementTree as ET
 #endregion
 
 
@@ -74,8 +75,12 @@ class BasinParameters(object):
 
             xmlfile = self.__SSXMLPath__("StreamStats{0}.xml".format(self.RegionID), self.__TempLocation__)
            
+            if parameters == '':
+                parameters = self.__allParams__(xmlfile)
+                self.__sm__('parameters list length: ' + str(len(parameters)))
+
             arcpy.CheckOutExtension("Spatial")
-            self.__sm__("Stated calc params")
+            self.__sm__("Started calc params")
 
             if input_basin != "none":
                 if arcpy.Exists(input_basin):
@@ -104,6 +109,14 @@ class BasinParameters(object):
             tb = traceback.format_exc() 
             self.__sm__("Error calculating parameters "+tb,"ERROR")
             self.isComplete = False
+    def __allParams__(self, xmlfile):
+        xmlParams = []
+
+        xmlDoc = ET.parse(xmlfile)
+        for apField in xmlDoc.findall(".//ApFunction[@TagName='WshParams']/ApFields[@TagName='ApFields']/ApField", xmlDoc):
+            param = apField.get('AliasName')
+            xmlParams.append(param)
+        return xmlParams
     def __parseParameterXML__(self, xmlfile):
         paramList = []
         try:
