@@ -77,6 +77,7 @@ class BasinParameters(object):
            
             if parameters == '':
                 parametersList = self.__allParams__(xmlfile)
+                seperator = ';'
                 parameters = seperator.join(parametersList)
                 self.__sm__('parameters list length: ' + str(len(parameters)))
 
