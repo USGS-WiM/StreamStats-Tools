@@ -79,7 +79,7 @@ class BasinParameters(object):
                 parametersList = self.__allParams__(xmlfile)
                 seperator = ';'
                 parameters = seperator.join(parametersList)
-                self.__sm__('parameters list length: ' + str(len(parameters)))
+                self.__sm__('parameters list: ' + parameters)
 
             arcpy.CheckOutExtension("Spatial")
             self.__sm__("Started calc params")
