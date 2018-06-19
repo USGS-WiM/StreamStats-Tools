@@ -3,7 +3,7 @@
       "name": "StreamStats-Tools",
       "organization": "U.S. Geological Survey",
       "description": "A collection of tools for StreamStats data preparation and upload to AWS",
-      "version": "v0.0.0",
+      "version": "v1.0.0",
       "status": ["Development"],
   
       "permissions": {

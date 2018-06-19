@@ -313,11 +313,9 @@ class updateS3Bucket(object):
             formatter.converter = time.gmtime
             handler.setFormatter(formatter)
 
-            os.path.dirname
-            with open('package.json') as p:
-                packagejson = json.load(p)
-                version = packagejson["version"]
-
+            with open(os.path.join(os.path.dirname( __file__ ), '..', 'code.json')) as c:
+                codejson = json.load(c)
+                version = codejson[0]["version"]
 
             logger.info('Region: ' + state.upper() + '; Repo version: ' + version + '; User: ' + user_name + '; AWS Key ID: ' + accessKeyID + '; ' + commands + 'Note: ' + logNote)
 
