@@ -6,6 +6,7 @@ from arcpy.sa import *
 from Delineation import Delineation as Delineation
 from BasinParameters import BasinParameters as BasinParameters
 import time
+import json
 
 class Toolbox(object):
     def __init__(self):
@@ -312,7 +313,13 @@ class updateS3Bucket(object):
             formatter.converter = time.gmtime
             handler.setFormatter(formatter)
 
-            logger.info('Region: ' + state.upper() + '; User: ' + user_name + '; AWS Key ID: ' + accessKeyID + '; ' + commands + 'Note: ' + logNote)
+            os.path.dirname
+            with open('package.json') as p:
+                packagejson = json.load(p)
+                version = packagejson["version"]
+
+
+            logger.info('Region: ' + state.upper() + '; Repo version: ' + version + '; User: ' + user_name + '; AWS Key ID: ' + accessKeyID + '; ' + commands + 'Note: ' + logNote)
 
             copyS3(logFolder, destFolder, '--recursive')
 
@@ -395,7 +402,7 @@ class updateS3Bucket(object):
             state = rootname.split('_ss.gdb')[0].lower()
 
             if schemaType == 'fgdb':
-                copyS3(schema_file, destinationBucket + '/' + state.lower() + '/' + rootname, '--recursive')
+                copyS3(schema_file, destinationBucket + '/' + state.lower() + '/' + rootname, '--recursive --dryrun')
                 commands += 'schema, '
 
             
@@ -515,9 +522,9 @@ class basinDelin(object):
 
         Results = {}
         workspace_name = os.path.basename(workspaceID)
-        GW_location = os.path.join(workspaceID, workspace_name + '.gdb')
-        GW_file = os.path.join(GW_location, 'Layers', 'GlobalWatershed')
-        GWP_file = os.path.join(GW_location, 'Layers', 'GlobalWatershedPoint')
+        GW_location = os.path.join(workspaceID, workspace_name + '.gdb', 'Layers')
+        GW_file = os.path.join(GW_location, 'GlobalWatershed')
+        GWP_file = os.path.join(GW_location, 'GlobalWatershedPoint')
         
         def validatePourPoint(ppoint):
             """validatePourPoint(ppoint=None)
@@ -603,18 +610,16 @@ class basinDelin(object):
         finally:
             print "Results="+json.dumps(Results) 
 
-        if not basin_params or basin_params != 'true':
+        if not parameters_list or not basin_params:
             Output_location = os.path.dirname(output_basin)
             Output_file = os.path.basename(output_basin)
                     
             if arcpy.Exists(GW_file):
                 messages.addMessage('Converting to output file')
                 arcpy.FeatureClassToFeatureClass_conversion(GW_file, Output_location, Output_file)
-                arcpy.Delete_management(GW_file)
-                arcpy.Delete_management(GWP_file)
 
 
-        if basin_params == 'true' or parameters_list:
+        if basin_params or parameters_list:
             if not parameters_list:
                 parameters_list = ''
             try:
@@ -708,8 +713,8 @@ class basinParams(object):
             parameters_list = ''
         Results = {}
         workspace_name = os.path.basename(workspaceID)
-        GW_location = os.path.join(workspaceID, workspace_name + '.gdb')
-        GW_file = os.path.join(GW_location, 'Layers', 'GlobalWatershed')
+        GW_location = os.path.join(workspaceID, workspace_name + '.gdb', 'Layers')
+        GW_file = os.path.join(GW_location, 'GlobalWatershed')
 
 
         try:

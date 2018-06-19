@@ -117,7 +117,7 @@ class BasinParameters(object):
         xmlDoc = ET.parse(xmlfile)
         for apField in xmlDoc.findall(".//ApFunction[@TagName='WshParams']/ApFields[@TagName='ApFields']/ApField", xmlDoc):
             param = apField.get('AliasName')
-            xmlParams.append(param)
+            xmlParams.append(param.lower())
         return xmlParams
     def __parseParameterXML__(self, xmlfile):
         paramList = []

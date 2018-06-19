@@ -1,0 +1,19 @@
+{
+  "name": "streamstats-tools",
+  "version": "1.0.0",
+  "description": "set up version",
+  "main": "ss-tools.pyt",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/USGS-WiM/StreamStats-Tools.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/USGS-WiM/StreamStats-Tools/issues"
+  },
+  "homepage": "https://github.com/USGS-WiM/StreamStats-Tools#readme"
+}
