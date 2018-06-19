@@ -5,6 +5,7 @@ from arcpy import env
 from arcpy.sa import *
 from Delineation import Delineation as Delineation
 from BasinParameters import BasinParameters as BasinParameters
+import time
 
 class Toolbox(object):
     def __init__(self):
@@ -191,7 +192,6 @@ class updateS3Bucket(object):
 
             #validate xml file
             stateabbr = filename.split('.xml')[0].split('StreamStats')[1].upper()
-            messages.addMessage('stateabbr:' + stateabbr)
             if fnmatch.fnmatch(filename, 'StreamStats*.xml') and stateabbr in states:
                 return True
             else:
@@ -224,7 +224,7 @@ class updateS3Bucket(object):
                 Determines if input state/region data folder is valid
             """
 
-            state = os.path.basename(folder)
+            state = os.path.basename(folder).lower()
 
             #validate state
             if state.upper() not in states:
@@ -235,13 +235,25 @@ class updateS3Bucket(object):
             else:
                 messages.addWarningMessage('Subfolder does not exist: ' + subfolder)
         
-        def copyS3(source=None,destination=None,args=None):
+        def copyS3(source=None,destination=None,args=None, log=False):
             """copyS3(source=None,destination=None,args=None)
                 Function to call AWS CLI tools copy source file or folder to and from s3 with error trapping
             """
-
             if args == None:
                 args = ""
+            
+            if checkS3Bucket(destination) and not log:
+                #delete destination folder first
+                cmd="aws s3 rm " + destination +  " " + args
+
+                try:
+                    output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
+                except subprocess.CalledProcessError as e:
+                    #messages.addErrorMessage('Make sure AWS CLI has been installed, and you have run "aws configure" to store credentials')
+                    messages.addErrorMessage(e.output)
+                    tb = traceback.format_exc()
+                    messages.addErrorMessage(tb)
+                    sys.exit()
 
             #create AWS CLI command
             cmd="aws s3 cp " + source + " " + destination +  " " + args
@@ -256,8 +268,6 @@ class updateS3Bucket(object):
                 tb = traceback.format_exc()
                 messages.addErrorMessage(tb)
                 sys.exit()
-            else:
-                messages.addMessage('Finished copying')
 
         def checkS3Bucket(fileLocation=None):
             """checkS3Bucket(fileLocation=None)
@@ -280,27 +290,29 @@ class updateS3Bucket(object):
             else:
                 messages.addMessage('Received list of elements in bucket')
 
-        def logData(folder=None,state=None):
+        def logData(folder=None,state=None, accessKeyID=None, commands=None):
             logFolder = os.path.join(folder, 'log')
-            logdir = os.path.join(logFolder, state + 'log.txt')
-            destFolder = 's3://streamstats-staged-data/KJ/' + state + '/log'
-            destFile = destFolder + '/' + state + 'log.txt'
+            logdir = os.path.join(logFolder, state.upper() + 'log.txt')
+            destFolder = 's3://streamstats-staged-data/KJ/' + state.lower() + '/log'
+            destFile = destFolder + '/' + state.upper() + 'log.txt'
 
             if checkS3Bucket(destFile) == 'True':
                 messages.addMessage('Log file found in s3, copying to folder')
-                copyS3(destFolder, logFolder, '--recursive')
+                copyS3(destFolder, logFolder, '--recursive', True)
             else:
                 messages.addMessage('No log found, creating file')
-                if not arcpy.Exists(logdir):
-                    os.makedirs(logdir)
+                if not arcpy.Exists(logFolder):
+                    os.makedirs(logFolder)
 
             formatter = logging.Formatter('%(asctime)s %(message)s')
             handler = logging.FileHandler(logdir)
-            handler.setFormatter(formatter)
             logger = logging.getLogger(state + 'log')
             logger.setLevel(logging.INFO)
             logger.addHandler(handler)
-            logger.info('Region: ' + state + '; User: ' + user_name + '; Note: ' + logNote)
+            formatter.converter = time.gmtime
+            handler.setFormatter(formatter)
+
+            logger.info('Region: ' + state.upper() + '; User: ' + user_name + '; AWS Key ID: ' + accessKeyID + '; ' + commands + 'Note: ' + logNote)
 
             copyS3(logFolder, destFolder, '--recursive')
 
@@ -324,6 +336,8 @@ class updateS3Bucket(object):
 
         messages.addGPMessages()
         
+        commands = 'Items Copied: '
+
         #check for state folder input
         if (copy_archydro or copy_bc_layers or copy_global or huc_folders) and not state_folder:
             messages.addWarningMessage('Make sure you input a state folder, then try again.')
@@ -331,21 +345,22 @@ class updateS3Bucket(object):
         if state_folder:
             messages.addMessage('Folder: ' + state_folder)
 
-            state = os.path.basename(state_folder)
+            state = os.path.basename(state_folder).lower()
             messages.addMessage('Processing: ' + state)
                 
             if copy_archydro == 'true' and validateStreamStatsDataFolder(state_folder, 'archydro'):
-                messages.addMessage('Copying archydro folder for: ' + state)
-                copyS3(state_folder + '/archydro',destinationBucket + '/' + state + '/archydro', '--recursive')
+                copyS3(state_folder + '/archydro',destinationBucket + '/' + state.lower() + '/archydro', '--recursive')
+                commands += 'archydro, '
 
             if copy_bc_layers == 'true' and validateStreamStatsDataFolder(state_folder, 'bc_layers'):
-                messages.addMessage('Copying bc_layers folder for: ' + state)
-                copyS3(state_folder + '/bc_layers',destinationBucket + '/' + state + '/bc_layers', '--recursive')
+                copyS3(state_folder + '/bc_layers',destinationBucket + '/' + state.lower() + '/bc_layers', '--recursive')
+                commands += 'bc_layers, '
 
             global_gdb = os.path.join(state_folder, 'archydro', 'global.gdb')
             if copy_global and os.path.isdir(global_gdb):
                 messages.addMessage('Copying global.gdb')
-                copyS3(global_gdb, destinationBucket + '/' + state + '/archydro/global.gdb', '--recursive')
+                copyS3(global_gdb, destinationBucket + '/' + state.lower() + '/archydro/global.gdb', '--recursive')
+                commands += 'global.gdb, '
             if huc_folders:
                 huc_folders = huc_folders.split(';')
                 for huc_folder in huc_folders:
@@ -355,7 +370,8 @@ class updateS3Bucket(object):
                         huc_folder = os.path.join(state_folder,'archydro', huc_folder)
                     if os.path.isdir(huc_folder):
                         huc_id = os.path.basename(huc_folder)
-                        copyS3(huc_folder, destinationBucket + '/' + state + '/archydro/' + huc_id, '--recursive')
+                        copyS3(huc_folder, destinationBucket + '/' + state.lower() + '/archydro/' + huc_id, '--recursive')
+                        commands += 'huc ' + huc_id + ', '
                     else:
                         messages.addMessage('Huc folder not found: ' + huc_id)
 
@@ -364,8 +380,9 @@ class updateS3Bucket(object):
             messages.addMessage('Now processing xml')
             if arcpy.Exists(xml_file) and validateStreamStatsXML(xml_file):
                 filename = xml_file.replace('\\','/').split('/')[-1]
-                state = filename.split('.xml')[0].split('StreamStats')[1].upper()
-                copyS3(xml_file, destinationBucket + '/' + state + '/' + filename, '')
+                state = filename.split('.xml')[0].split('StreamStats')[1]
+                copyS3(xml_file, destinationBucket + '/' + state.lower() + '/' + filename, '')
+                commands += 'xml, '
             else:
                 messages.addWarningMessage("There is no valid .xml file.  File should be named 'Streamstats" + state + ".xml'.")
                 sys.exit()
@@ -374,14 +391,15 @@ class updateS3Bucket(object):
         if schema_file:
             messages.addMessage('Now processing schema')
             schemaType = validateStreamStatsSchema(schema_file)
-            rootname = schema.replace('\\','/').split('/')[-1]
-            state = rootname.split('_ss.gdb')[0].upper()
+            rootname = schema_file.replace('\\','/').split('/')[-1]
+            state = rootname.split('_ss.gdb')[0].lower()
 
             if schemaType == 'fgdb':
-                copyS3(schema_file, destinationBucket + '/' + state + '/' + rootname, '--recursive')
+                copyS3(schema_file, destinationBucket + '/' + state.lower() + '/' + rootname, '--recursive')
+                commands += 'schema, '
 
             
-        logData(state_folder,state)
+        logData(state_folder,state, accessKeyID, commands)
 
 class basinDelin(object):
     # region Constructor
