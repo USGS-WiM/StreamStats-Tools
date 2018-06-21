@@ -88,12 +88,12 @@ class BasinParameters(object):
                 if arcpy.Exists(input_basin):
                     ArcHydroTools.StreamstatsGlobalParametersServer(input_basin, os.path.join(workspace,"GlobalWatershedPoint"), 
                                                                 parameters, outputFile.format(".xml"), outputFile.format(".htm"), 
-                                                                xmlfile,"", self.WorkspaceID )
+                                                                xmlfile,"", 'scratch.gdb' )
             else:
                 ArcHydroTools.StreamstatsGlobalParametersServer(os.path.join(workspace,"GlobalWatershed"), 
                                                                 os.path.join(workspace,"GlobalWatershedPoint"), 
                                                                 parameters, outputFile.format(".xml"), outputFile.format(".htm"), 
-                                                                xmlfile,"", self.WorkspaceID )
+                                                                xmlfile,"", 'scratch.gdb' )
 
             self.__sm__(arcpy.GetMessages(),'AHMSG')
             arcpy.CheckInExtension("Spatial")

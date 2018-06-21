@@ -205,9 +205,10 @@ class updateS3Bucket(object):
             """
 
             filename = item.replace('\\','/').split('/')[-1]
+            stateabbr = filename.split('_ss.gdb')[0]
 
             #validate file gdb
-            if os.path.isdir(item) and filename.find('gdb'):
+            if os.path.isdir(item) and filename.find('gdb') and stateabbr in states:
                 try:
                     desc = arcpy.Describe(item)
                     if desc.dataType == 'Workspace':
@@ -339,7 +340,6 @@ class updateS3Bucket(object):
 
         states = ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "CRB","DC", "DE", "DRB", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "RRB", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"]
 
-        messages.addGPMessages()
         
         commands = 'Items Copied: '
 
@@ -518,7 +518,6 @@ class basinDelin(object):
 
         stabbr = os.path.basename(state_folder)
 
-        Results = {}
         workspace_name = os.path.basename(workspaceID)
         GW_location = os.path.join(workspaceID, workspace_name + '.gdb', 'Layers')
         GW_file = os.path.join(GW_location, 'GlobalWatershed')
@@ -593,20 +592,14 @@ class basinDelin(object):
             ssdel.Delineate(ppoint)
             
 
-            Results = {
-                    "Workspace": ssdel.WorkspaceID,
-                    "Message": ssdel.Message.replace("'",'"').replace('\n',' ')
-                    }
 
         except:
             tb = traceback.format_exc()
-            messages.addMessage(tb)
-            Results = {
-                    "error": {"message": tb}
-                    }
-
+            messages.addErrorMessage(tb)
+        
         finally:
-            print "Results="+json.dumps(Results) 
+            messages.addGPMessages()
+
 
         if not parameters_list or not basin_params:
             Output_location = os.path.dirname(output_basin)
@@ -624,28 +617,17 @@ class basinDelin(object):
                 messages.addMessage('Calculating Basin Characteristics')
                 ssBp = BasinParameters(stabbr, workspaceID, parameters_list, "none")
             
-
+            
                 if ssBp.isComplete:
-                    Results = {"Parameters": ssBp.ParameterList, "Message": ssBp.Message.replace("'",'"').replace('\n',' ')}
-                else:
-                    Results = {"Parameters": [],"Message": ssBp.Message.replace("'",'"').replace('\n',' ')}
-
-                print "Results="+json.dumps(Results)
+                    params = []
+                    for parameter in ssBp.ParameterList:
+                        params.append(parameter['code'])
+                    messages.addMessage("Parameters: " + (',').join(params))
             except:
                 tb = traceback.format_exc()
-                messages.addMessage(tb)
-                Results = {
-                    "error": {"message": tb}
-                }
+                messages.addErrorMessage(tb)
             finally:
-                print "Results=" + json.dumps(Results)
-                if output_basin:
-                    Output_location = os.path.dirname(output_basin)
-                    Output_file = os.path.basename(output_basin)
-
-                    if arcpy.Exists(GW_file):
-                        messages.addMessage('Converting to output file')
-                        arcpy.FeatureClassToFeatureClass_conversion(GW_file, Output_location, Output_file)        
+                messages.addGPMessages()
 
 class basinParams(object):
     # region Constructor
@@ -709,7 +691,6 @@ class basinParams(object):
 
         if not parameters_list:
             parameters_list = ''
-        Results = {}
         workspace_name = os.path.basename(workspaceID)
         GW_location = os.path.join(workspaceID, workspace_name + '.gdb', 'Layers')
         GW_file = os.path.join(GW_location, 'GlobalWatershed')
@@ -718,19 +699,16 @@ class basinParams(object):
         try:
             messages.addMessage('Calculating Basin Characteristics')
             ssBp = BasinParameters(stabbr, workspaceID, parameters_list, input_basin)
-        
+
 
             if ssBp.isComplete:
-                Results = {"Parameters": ssBp.ParameterList, "Message": ssBp.Message.replace("'",'"').replace('\n',' ')}
-            else:
-                Results = {"Parameters": [],"Message": ssBp.Message.replace("'",'"').replace('\n',' ')}
+                params = []
+                for parameter in ssBp.ParameterList:
+                    params.append(parameter['code'])
+                messages.addMessage("Parameters: " + (',').join(params))
 
-            print "Results="+json.dumps(Results)
         except:
             tb = traceback.format_exc()
-            messages.addMessage(tb)
-            Results = {
-                "error": {"message": tb}
-            }
+            messages.addErrorMessage(tb)
         finally:
-            print "Results=" + json.dumps(Results)  
+            messages.addGPMessages()
