@@ -323,8 +323,7 @@ class updateS3Bucket(object):
             copyS3(logFolder, destFolder, '--recursive')
 
             logging.shutdown()
-            del logdir
-            del logFolder
+            arcpy.Delete_management(logdir)
 
         #start main program
         try:
@@ -336,7 +335,7 @@ class updateS3Bucket(object):
             messages.addErrorMessage('Error using aws credentials')
             sys.exit()
 
-        destinationBucket = 's3://streamstats-staged-data/KJ'
+        destinationBucket = 's3://streamstats-staged-data/test-data'
 
         states = ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "CRB","DC", "DE", "DRB", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "RRB", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"]
 
