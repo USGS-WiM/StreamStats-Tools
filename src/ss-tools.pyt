@@ -626,6 +626,11 @@ class basinDelin(object):
                 tb = traceback.format_exc()
                 messages.addErrorMessage(tb)
             finally:
+                Output_location = os.path.dirname(output_basin)
+                Output_file = os.path.basename(output_basin)
+                if arcpy.Exists(GW_file):
+                    messages.addMessage('Converting to output file')
+                    arcpy.FeatureClassToFeatureClass_conversion(GW_file, Output_location, Output_file)
                 messages.addGPMessages()
 
 class basinParams(object):
