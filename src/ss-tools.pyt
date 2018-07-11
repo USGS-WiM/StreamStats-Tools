@@ -295,7 +295,7 @@ class updateS3Bucket(object):
         def logData(folder=None,state=None, accessKeyID=None, commands=None):
             logFolder = os.path.join(folder, 'log')
             logdir = os.path.join(logFolder, state.upper() + 'log.txt')
-            destFolder = 's3://streamstats-staged-data/test-data/' + state.lower() + '/log'
+            destFolder = destinationBucket + state.lower() + '/log'
             destFile = destFolder + '/' + state.upper() + 'log.txt'
 
             if checkS3Bucket(destFile) == 'True':
@@ -314,7 +314,7 @@ class updateS3Bucket(object):
             formatter.converter = time.gmtime
             handler.setFormatter(formatter)
 
-            with open(os.path.join(os.path.dirname( __file__ ), '..', 'code.json')) as c:
+            with open(os.path.join(os.path.dirname( __file__ ), 'code.json')) as c:
                 codejson = json.load(c)
                 version = codejson[0]["version"]
 
