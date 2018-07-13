@@ -295,7 +295,7 @@ class updateS3Bucket(object):
         def logData(folder=None,state=None, accessKeyID=None, commands=None):
             logFolder = os.path.join(folder, 'log')
             logdir = os.path.join(logFolder, state.upper() + 'log.txt')
-            destFolder = destinationBucket + state.lower() + '/log'
+            destFolder = destinationBucket + '/' + state.lower() + '/log'
             destFile = destFolder + '/' + state.upper() + 'log.txt'
 
             if checkS3Bucket(destFile) == 'True':
