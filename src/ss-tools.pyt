@@ -456,13 +456,6 @@ class basinDelin(object):
             parameterType="Required",
             direction="Input")
 
-        output_basin = arcpy.Parameter(
-            displayName="Output Watershed",
-            name="output_basin",
-            datatype="DEFeatureClass",
-            parameterType="Required",
-            direction="Output")
-
         basin_params = arcpy.Parameter(
             displayName="Calculate All Basin Characteristics",
             name="basin_params",
@@ -478,7 +471,7 @@ class basinDelin(object):
             direction="Input")
 
 
-        parameters = [state_folder, schema_file, xml_file, workspaceID, pourpoint, pourpointwkid, output_basin, basin_params, parameters_list] 
+        parameters = [state_folder, schema_file, xml_file, workspaceID, pourpoint, pourpointwkid, basin_params, parameters_list] 
         return parameters
     
     def isLicensed(self):
@@ -487,17 +480,6 @@ class basinDelin(object):
     def updateParameters(self, parameters):
         if not parameters[5].altered:
             parameters[5].value = '4326'
-        if parameters[3].altered and not parameters[6].altered:
-            workspace_name = os.path.basename(parameters[3].valueAsText)
-            parameters[6].value = os.path.join(parameters[3].valueAsText, workspace_name+'.gdb','Watershed')
-        if parameters[6].altered:
-            basin_dir = os.path.dirname(parameters[6].valueAsText)
-            if not basin_dir.endswith('.gdb') or parameters[6].valueAsText.endswith('.shp'):
-                try:
-                    pythonaddins.MessageBox("Basin must be within a geodatabase, and should not be an '.shp' file.", 'ERROR', 0)
-                except Exception, ErrorDesc:
-                    logger.error("There was an error setting error message: "+str(ErrorDesc))
-        return
 
     def UpdateMessages(self, parameters):
         return
@@ -509,9 +491,8 @@ class basinDelin(object):
         workspaceID     = parameters[3].valueAsText
         pourpoint       = parameters[4].valueAsText
         pourpointwkid   = parameters[5].valueAsText
-        output_basin    = parameters[6].valueAsText
-        basin_params    = parameters[7].valueAsText
-        parameters_list = parameters[8].valueAsText
+        basin_params    = parameters[6].valueAsText
+        parameters_list = parameters[7].valueAsText
 
         arcpy.env.overwriteOutput = True
 
@@ -596,17 +577,15 @@ class basinDelin(object):
             tb = traceback.format_exc()
             messages.addErrorMessage(tb)
         
-        finally:
-            messages.addGPMessages()
+        messages.addGPMessages()
 
 
-        if not parameters_list or not basin_params:
-            Output_location = os.path.dirname(output_basin)
-            Output_file = os.path.basename(output_basin)
-                    
-            if arcpy.Exists(GW_file):
-                messages.addMessage('Converting to output file')
-                arcpy.FeatureClassToFeatureClass_conversion(GW_file, Output_location, Output_file)
+        if arcpy.Exists(GW_file):
+            messages.addMessage('Placing on Map')
+            mxd = arcpy.mapping.MapDocument("CURRENT")
+            df = arcpy.mapping.ListDataFrames(mxd, "*")[0]
+            newlayer = arcpy.mapping.Layer(GW_file)
+            arcpy.mapping.AddLayer(df, newlayer,"BOTTOM")
 
 
         if basin_params or parameters_list:
@@ -625,13 +604,6 @@ class basinDelin(object):
             except:
                 tb = traceback.format_exc()
                 messages.addErrorMessage(tb)
-            finally:
-                Output_location = os.path.dirname(output_basin)
-                Output_file = os.path.basename(output_basin)
-                if arcpy.Exists(GW_file):
-                    messages.addMessage('Converting to output file')
-                    arcpy.FeatureClassToFeatureClass_conversion(GW_file, Output_location, Output_file)
-                messages.addGPMessages()
 
 class basinParams(object):
     # region Constructor
@@ -642,16 +614,9 @@ class basinParams(object):
     def getParameterInfo(self):
         # Define parameter definitions
 
-        stabbr = arcpy.Parameter(
-            displayName="Abbreviated region name",
-            name="stabbr",
-            datatype="GPString",
-            parameterType="Required",
-            direction="Input")
-
-        workspaceID = arcpy.Parameter(
-            displayName="Workspace folder",
-            name="workspaceID",
+        state_folder = arcpy.Parameter(
+            displayName="Select input state/region folder",
+            name="state_folder",
             datatype="DEFolder",
             parameterType="Required",
             direction="Input")
@@ -670,46 +635,45 @@ class basinParams(object):
             parameterType="Required",
             direction="Input")
 
-        parameters = [stabbr, workspaceID, parameters_list, input_basin] 
+        parameters = [state_folder, parameters_list, input_basin] 
         return parameters
     
     def isLicensed(self):
         return True
 
     def updateParameters(self, parameters):
-        if parameters[1].altered and not parameters[3].altered:
-            workspace_name = os.path.basename(parameters[1].valueAsText)
-            parameters[3].value = os.path.join(parameters[1].valueAsText, workspace_name+'.gdb','Watershed')
         return
 
     def UpdateMessages(self, parameters):
         return
 
     def execute(self, parameters, messages): 
-        stabbr          = parameters[0].valueAsText
-        workspaceID     = parameters[1].valueAsText
-        parameters_list = parameters[2].valueAsText
-        input_basin     = parameters[3].valueAsText
+        state_folder    = parameters[0].valueAsText
+        parameters_list = parameters[1].valueAsText
+        input_basin     = parameters[2].valueAsText
 
         arcpy.env.overwriteOutput = True
 
         if not parameters_list:
             parameters_list = ''
-        workspace_name = os.path.basename(workspaceID)
-        GW_location = os.path.join(workspaceID, workspace_name + '.gdb', 'Layers')
+        workspace_gdb_name = os.path.dirname(input_basin)
+        workspace = os.path.dirname(workspace_gdb_name)
+        GW_location = os.path.join(workspace_gdb_name, 'Layers')
         GW_file = os.path.join(GW_location, 'GlobalWatershed')
+
+        stabbr = os.path.basename(state_folder)
 
 
         try:
             messages.addMessage('Calculating Basin Characteristics')
-            ssBp = BasinParameters(stabbr, workspaceID, parameters_list, input_basin)
+            ssBp = BasinParameters(stabbr, workspace, parameters_list, input_basin)
 
 
             if ssBp.isComplete:
                 params = []
-                for parameter in ssBp.ParameterList:
-                    params.append(parameter['code'])
-                messages.addMessage("Parameters: " + (',').join(params))
+            for parameter in ssBp.ParameterList:
+                params.append(parameter['code'])
+            messages.addMessage("Parameters: " + (',').join(params))
 
         except:
             tb = traceback.format_exc()
