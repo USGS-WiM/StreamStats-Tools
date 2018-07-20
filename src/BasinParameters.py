@@ -49,8 +49,14 @@ class BasinParameters(object):
         self.ParameterList = None
 
         logdir = os.path.join(self.__TempLocation__, 'parameter.log')
-        logging.basicConfig(filename=logdir, format ='%(asctime)s %(message)s', level=logging.DEBUG)
-         
+
+        formatter = logging.Formatter('%(asctime)s %(message)s')
+        handler = logging.FileHandler(logdir)
+        self.__logger__ = logging.getLogger('parameter')
+        self.__logger__.setLevel(logging.INFO)
+        self.__logger__.addHandler(handler)
+        handler.setFormatter(formatter)
+        
          #Test if workspace exists before run   
         if(not self.__workspaceValid__(os.path.join(self.__MainDirectory__, self.WorkspaceID+".gdb","Layers"))):
             return
@@ -88,12 +94,12 @@ class BasinParameters(object):
                 if arcpy.Exists(input_basin):
                     ArcHydroTools.StreamstatsGlobalParametersServer(input_basin, os.path.join(workspace,"GlobalWatershedPoint"), 
                                                                 parameters, outputFile.format(".xml"), outputFile.format(".htm"), 
-                                                                xmlfile,"", 'scratch.gdb' )
+                                                                xmlfile,"", self.WorkspaceID )
             else:
                 ArcHydroTools.StreamstatsGlobalParametersServer(os.path.join(workspace,"GlobalWatershed"), 
                                                                 os.path.join(workspace,"GlobalWatershedPoint"), 
                                                                 parameters, outputFile.format(".xml"), outputFile.format(".htm"), 
-                                                                xmlfile,"", 'scratch.gdb' )
+                                                                xmlfile,"", self.WorkspaceID )
 
             self.__sm__(arcpy.GetMessages(),'AHMSG')
             arcpy.CheckInExtension("Spatial")
@@ -111,6 +117,9 @@ class BasinParameters(object):
             tb = traceback.format_exc() 
             self.__sm__("Error calculating parameters "+tb,"ERROR")
             self.isComplete = False
+        finally:
+            arcpy.ResetEnvironments()
+            arcpy.ClearEnvironment("workspace")
     def __allParams__(self, xmlfile):
         xmlParams = []
 
@@ -146,13 +155,16 @@ class BasinParameters(object):
             self.__sm__("Workspace " + workspace + " does not exist")
             return False
 
+        if arcpy.TestSchemaLock(workspace):		
+            self.__sm__("Workspace " + workspace + " has a schema lock","AHMSG")		
+            return False
         self.__sm__("Workspace " + workspace + " is valid")
         return True
     def __setScratchWorkspace__(self, directory):
         if (arcpy.Exists(os.path.join(directory,"scratch.gdb"))):
             arcpy.Delete_management(os.path.join(directory,"scratch.gdb"))
         arcpy.CreateFileGDB_management(directory,'scratch.gdb')
-        return os.path.join(directory,"scratch.gdb")  
+        return os.path.join(directory,"scratch.gdb") 
     def __SSXMLPath__(self, xmlFileName, newTempWorkspace = "#"):
         file = None
         xmlFile =''
@@ -174,6 +186,17 @@ class BasinParameters(object):
 
                 #update tempworkspace
                 xmlDoc = xml.dom.minidom.parse(xmlFile)
+                archydroPath = os.path.join(self.__dataFolder__, 'archydro')
+                bcLayersPath = os.path.join(self.__dataFolder__, 'bc_layers')
+                xmlDoc.getElementsByTagName('RASTERDATAPATH')[0].firstChild.data = bcLayersPath
+                xmlDoc.getElementsByTagName('VECTORDATAPATH')[0].firstChild.data = bcLayersPath
+                xmlDoc.getElementsByTagName('RasterLocation')[0].firstChild.data = archydroPath
+                xmlDoc.getElementsByTagName('VectorLocation')[0].firstChild.data = os.path.join(archydroPath,"global.gdb")
+                xmlDoc.getElementsByTagName('RasterLocation')[1].firstChild.data = archydroPath
+                xmlDoc.getElementsByTagName('VectorLocation')[1].firstChild.data = os.path.join(archydroPath,"global.gdb")
+                xmlDoc.getElementsByTagName('DataPath')[0].firstChild.data = archydroPath
+                xmlDoc.getElementsByTagName('GlobalDataPath')[0].firstChild.data = os.path.join(archydroPath,"global.gdb")
+                
                 xmlDoc.getElementsByTagName('TempLocation')[0].firstChild.data = newTempWorkspace
                 file = open(xmlFile,"wb")
                 xmlDoc.writexml(file)
@@ -191,6 +214,6 @@ class BasinParameters(object):
     def __sm__(self, msg, type = 'INFO'):
         self.Message += type +':' + msg.replace('_',' ') + '_'
 
-        if type in ('ERROR'): logging.error(msg)
-        else : logging.info(msg)
+        if type in ('ERROR'): self.__logger__.error(msg)
+        else : self.__logger__.info(msg)
     #endregion

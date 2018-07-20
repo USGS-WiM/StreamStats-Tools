@@ -570,14 +570,13 @@ class basinDelin(object):
             ssdel = Delineation(stabbr, schemaCheck, xmlCheck, workspaceID, state_folder)
             ppoint = ssdel._buildAHPourpoint(ppoint, pourpointwkid)
             ssdel.Delineate(ppoint)
-            
+
 
 
         except:
             tb = traceback.format_exc()
             messages.addErrorMessage(tb)
-        
-        messages.addGPMessages()
+
 
 
         if arcpy.Exists(GW_file):
@@ -586,24 +585,34 @@ class basinDelin(object):
             df = arcpy.mapping.ListDataFrames(mxd, "*")[0]
             newlayer = arcpy.mapping.Layer(GW_file)
             arcpy.mapping.AddLayer(df, newlayer,"BOTTOM")
+        
 
+            if basin_params or parameters_list:
+                if not parameters_list:
+                    parameters_list = ''
+                try:
+                    messages.addMessage('Calculating Basin Characteristics')
+                    ssBp = BasinParameters(stabbr, workspaceID, parameters_list, "none")
+                
+                
+                    if ssBp.isComplete:
+                        params = []
+                        for parameter in ssBp.ParameterList:
+                            params.append(parameter['code'])
+                        messages.addMessage("Parameters: " + (',').join(params))
+                except:
+                    tb = traceback.format_exc()
+                    messages.addErrorMessage(tb)
 
-        if basin_params or parameters_list:
-            if not parameters_list:
-                parameters_list = ''
-            try:
-                messages.addMessage('Calculating Basin Characteristics')
-                ssBp = BasinParameters(stabbr, workspaceID, parameters_list, "none")
-            
-            
-                if ssBp.isComplete:
-                    params = []
-                    for parameter in ssBp.ParameterList:
-                        params.append(parameter['code'])
-                    messages.addMessage("Parameters: " + (',').join(params))
-            except:
-                tb = traceback.format_exc()
-                messages.addErrorMessage(tb)
+        else:
+            if ssdel.error != "":
+                messages.addErrorMessage('Delineation Error ' + ssdel.error)
+            messages.addErrorMessage('Delination Failed. Please make sure the point is in the given region.  If delineation still fails, try restarting the program.')
+        arcpy.ResetEnvironments()
+        arcpy.ClearEnvironment("workspace")
+        arcMessages = arcpy.GetMessages()
+        if "ERROR" in arcMessages:
+            messages.addGPMessages()
 
 class basinParams(object):
     # region Constructor
@@ -656,27 +665,29 @@ class basinParams(object):
 
         if not parameters_list:
             parameters_list = ''
-        workspace_gdb_name = os.path.dirname(input_basin)
-        workspace = os.path.dirname(workspace_gdb_name)
-        GW_location = os.path.join(workspace_gdb_name, 'Layers')
-        GW_file = os.path.join(GW_location, 'GlobalWatershed')
+        workspace_gdb_name = os.path.dirname(os.path.dirname(input_basin))
+        workspaceID = os.path.dirname(workspace_gdb_name)
 
         stabbr = os.path.basename(state_folder)
 
 
         try:
             messages.addMessage('Calculating Basin Characteristics')
-            ssBp = BasinParameters(stabbr, workspace, parameters_list, input_basin)
+            ssBp = BasinParameters(stabbr, workspaceID, parameters_list, input_basin)
 
 
             if ssBp.isComplete:
                 params = []
-            for parameter in ssBp.ParameterList:
-                params.append(parameter['code'])
-            messages.addMessage("Parameters: " + (',').join(params))
+                for parameter in ssBp.ParameterList:
+                    params.append(parameter['code'])
+                messages.addMessage("Parameters: " + (',').join(params))
 
         except:
             tb = traceback.format_exc()
             messages.addErrorMessage(tb)
         finally:
-            messages.addGPMessages()
+            arcMessages = arcpy.GetMessages()
+            if "ERROR" in arcMessages:
+                messages.addGPMessages()
+            arcpy.ResetEnvironments()
+            arcpy.ClearEnvironment("workspace")

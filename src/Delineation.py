@@ -45,14 +45,21 @@ class Delineation(object):
         self.__templatePath__ = os.path.join(self.__schemaPath__,"Layers")
         self.WorkspaceID = os.path.basename(workspaceID)
         self.__WorkspaceDirectory__ = self.__getDirectory__(workspaceID)
+        self.error = ""
+        self.isComplete = False
 
         self.__TempLocation__ = os.path.join(self.__WorkspaceDirectory__, "Temp")
 
         #set up logging
         logdir = os.path.join(self.__TempLocation__, 'delineation.log')
-        logging.basicConfig(filename=logdir, format ='%(asctime)s %(message)s', level=logging.DEBUG)
 
-        self.__sm__("Initialized")         
+        formatter = logging.Formatter('%(asctime)s %(message)s')
+        handler = logging.FileHandler(logdir)
+        self.__logger__ = logging.getLogger('delineation')
+        self.__logger__.setLevel(logging.INFO)
+        self.__logger__.addHandler(handler)
+        handler.setFormatter(formatter)
+        self.__sm__("Initialized")       
     #endregion   
         
     #region Methods   
@@ -96,7 +103,7 @@ class Delineation(object):
             arcpy.CheckOutExtension("Spatial")
             self.__sm__("Starting Delineation")
 
-            ArcHydroTools.StreamstatsGlobalWatershedDelineation(PourPoint, GW, GWP, xmlPath , "CLEARFEATURES_NO", 'scratch.gdb')
+            ArcHydroTools.StreamstatsGlobalWatershedDelineation(PourPoint, GW, GWP, xmlPath , "CLEARFEATURES_NO", self.WorkspaceID)
             self.__sm__(arcpy.GetMessages(),'AHMSG')
 
             #remove holes  
@@ -106,6 +113,7 @@ class Delineation(object):
             self.__sm__("Finished")
         except:
             tb = traceback.format_exc()
+            self.error = tb
             self.__sm__("Delineation Error "+tb,"ERROR")
 
         finally:
@@ -114,6 +122,8 @@ class Delineation(object):
             del sr
             arcpy.Delete_management(PourPoint)
             arcpy.Delete_management(GW)
+            arcpy.ResetEnvironments()
+            arcpy.ClearEnvironment("workspace")
             #arcpy.Delete_management(self.__TempLocation__)
     #endregion  
       
@@ -121,7 +131,7 @@ class Delineation(object):
     def __removePolygonHoles__(self, polyFC, path):
         try:
             
-            result = arcpy.EliminatePolygonPart_management(polyFC, os.path.join(path,"GlobalWatershed"), "AREA", "90 squaremeters", 1, "ANY")#modified CONTAINED_ONLY
+            result = arcpy.EliminatePolygonPart_management(polyFC, os.path.join(path,"GlobalWatershed"), "AREA_OR_PERCENT", "90 squaremeters", 1, "ANY")#modified CONTAINED_ONLY
 
             self.__sm__(arcpy.GetMessages())
             return result
@@ -163,6 +173,8 @@ class Delineation(object):
             xmlDoc.getElementsByTagName('VECTORDATAPATH')[0].firstChild.data = os.path.join(archydroPath,"global.gdb")
             xmlDoc.getElementsByTagName('RasterLocation')[0].firstChild.data = archydroPath
             xmlDoc.getElementsByTagName('VectorLocation')[0].firstChild.data = os.path.join(archydroPath,"global.gdb")
+            xmlDoc.getElementsByTagName('RasterLocation')[1].firstChild.data = archydroPath
+            xmlDoc.getElementsByTagName('VectorLocation')[1].firstChild.data = os.path.join(archydroPath,"global.gdb")
             xmlDoc.getElementsByTagName('DataPath')[0].firstChild.data = archydroPath
             xmlDoc.getElementsByTagName('GlobalDataPath')[0].firstChild.data = os.path.join(archydroPath,"global.gdb")
 
@@ -181,8 +193,8 @@ class Delineation(object):
     def __sm__(self, msg, type = 'INFO'):
         self.Message += type +':' + msg.replace('_',' ') + '_'
 
-        if type in ('ERROR'): logging.error(msg)
-        else : logging.info(msg)
+        if type in ('ERROR'): self.__logger__.error(msg)
+        else : self.__logger__.info(msg)
     def _buildAHPourpoint(self, ppt, wkid):
             try:
                 arcpy.env.workspace = self.__TempLocation__
