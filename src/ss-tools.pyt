@@ -480,6 +480,7 @@ class basinDelin(object):
     def updateParameters(self, parameters):
         if not parameters[5].altered:
             parameters[5].value = '4326'
+        return
 
     def UpdateMessages(self, parameters):
         return
@@ -561,6 +562,13 @@ class basinDelin(object):
                 messages.addErrorMessage('You did not select a valid schema: ' + item)
                 sys.exit()
 
+        wsID = os.path.basename(workspaceID)
+        wshed = os.path.join(workspaceID, wsID + '.gdb', 'Layers', 'GlobalWatershed')
+        if arcpy.Exists(wshed):
+            val = pythonaddins.MessageBox(wshed + ' already exists.  Would you like to overwrite it?', 'Warning', 4)
+            if val == 'No':
+                messages.addWarningMessage('Script cancelled due to existing watershed.')
+                sys.exit()
         
         messages.addMessage('Delineating Basin')
         schemaCheck = validateSchema(schema_file)
@@ -607,13 +615,13 @@ class basinDelin(object):
         else:
             if ssdel.error != "":
                 messages.addErrorMessage('Delineation Error ' + ssdel.error)
-            messages.addErrorMessage('Delination Failed. Please make sure the point is in the given region.  If delineation still fails, try restarting the program.')
+            messages.addErrorMessage('Delination Failed. Please make sure the point is in the given region.  If delineation still fails, try again in another map document or ArcMap session.')
+        arcMessages = arcpy.GetMessages()
+        if arcMessages.find('ERROR') > -1 or arcMessages.find('Failed') > -1:
+            messages.addGPMessages()
         arcpy.ResetEnvironments()
         arcpy.ClearEnvironment("workspace")
-        arcMessages = arcpy.GetMessages()
-        if "ERROR" in arcMessages:
-            messages.addGPMessages()
-
+        
 class basinParams(object):
     # region Constructor
     def __init__(self):
@@ -670,6 +678,11 @@ class basinParams(object):
 
         stabbr = os.path.basename(state_folder)
 
+        tempDir = os.path.join(workspaceID, 'Temp')
+        xmlLoc = os.path.join(tempDir, 'StreamStats' + stabbr + '.xml')
+        if not arcpy.Exists(xmlLoc):
+            messages.addErrorMessage('Regional xml: "' + xmlLoc + '" not found.')
+            sys.exit()
 
         try:
             messages.addMessage('Calculating Basin Characteristics')
@@ -687,7 +700,12 @@ class basinParams(object):
             messages.addErrorMessage(tb)
         finally:
             arcMessages = arcpy.GetMessages()
-            if "ERROR" in arcMessages:
+            if arcMessages.find('ERROR') > -1 or arcMessages.find('Failed') > -1:
                 messages.addGPMessages()
+            elif arcMessages.find('Raster not found') > -1:
+                messages.addWarningMessage('Raster not found for one or more characteristics.  Please make sure the data for each characteristic is in the "bc_layers" folder.')
+            elif arcMessages.find('Cataloging Unit') > -1:
+                messages.addGPMessages()
+                messages.addErrorMessage('Please make sure the basin is in the given region.  If computation still fails, try again in another map document or ArcMap session.')
             arcpy.ResetEnvironments()
             arcpy.ClearEnvironment("workspace")
