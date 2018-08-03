@@ -399,7 +399,7 @@ class updateS3Bucket(object):
             state = rootname.split('_ss.gdb')[0].lower()
 
             if schemaType == 'fgdb':
-                copyS3(schema_file, destinationBucket + '/' + state.lower() + '/' + rootname, '--recursive --dryrun')
+                copyS3(schema_file, destinationBucket + '/' + state.lower() + '/' + rootname, '--recursive')
                 commands += 'schema, '
 
             
