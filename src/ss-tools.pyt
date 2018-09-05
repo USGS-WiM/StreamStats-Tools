@@ -449,12 +449,6 @@ class basinDelin(object):
             parameterType="Required",
             direction="Input")
 
-        pourpointwkid = arcpy.Parameter(
-            displayName="Esri Well Known ID (wkid)",
-            name="pourpointwkid",
-            datatype="GPString",
-            parameterType="Required",
-            direction="Input")
 
         basin_params = arcpy.Parameter(
             displayName="Calculate All Basin Characteristics",
@@ -471,7 +465,7 @@ class basinDelin(object):
             direction="Input")
 
 
-        parameters = [state_folder, schema_file, xml_file, workspaceID, pourpoint, pourpointwkid, basin_params, parameters_list] 
+        parameters = [state_folder, schema_file, xml_file, workspaceID, pourpoint, basin_params, parameters_list] 
         return parameters
     
     def isLicensed(self):
@@ -491,9 +485,8 @@ class basinDelin(object):
         xml_file        = parameters[2].valueAsText
         workspaceID     = parameters[3].valueAsText
         pourpoint       = parameters[4].valueAsText
-        pourpointwkid   = parameters[5].valueAsText
-        basin_params    = parameters[6].valueAsText
-        parameters_list = parameters[7].valueAsText
+        basin_params    = parameters[5].valueAsText
+        parameters_list = parameters[6].valueAsText
 
         arcpy.env.overwriteOutput = True
 
@@ -576,7 +569,7 @@ class basinDelin(object):
         ppoint = validatePourPoint(pourpoint)
         try:
             ssdel = Delineation(stabbr, schemaCheck, xmlCheck, workspaceID, state_folder)
-            ppoint = ssdel._buildAHPourpoint(ppoint, pourpointwkid)
+            ppoint = ssdel._buildAHPourpoint(ppoint, '4326')
             ssdel.Delineate(ppoint)
 
 
