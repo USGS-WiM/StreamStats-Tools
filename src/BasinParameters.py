@@ -112,7 +112,7 @@ class BasinParameters(object):
             self.ParameterList = plist
             self.isComplete = True
 
-            self.__sm__("finished")
+            self.__sm__("finished \n")
         except:
             tb = traceback.format_exc() 
             self.__sm__("Error calculating parameters "+tb,"ERROR")

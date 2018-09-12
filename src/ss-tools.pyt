@@ -5,6 +5,7 @@ from arcpy import env
 from arcpy.sa import *
 from Delineation import Delineation as Delineation
 from BasinParameters import BasinParameters as BasinParameters
+from ParseXML import ParseXML as ParseXML
 import time
 import json
 
@@ -572,13 +573,9 @@ class basinDelin(object):
             ppoint = ssdel._buildAHPourpoint(ppoint, '4326')
             ssdel.Delineate(ppoint)
 
-
-
         except:
             tb = traceback.format_exc()
             messages.addErrorMessage(tb)
-
-
 
         if arcpy.Exists(GW_file):
             messages.addMessage('Placing on Map')
@@ -588,13 +585,12 @@ class basinDelin(object):
             arcpy.mapping.AddLayer(df, newlayer,"BOTTOM")
         
 
-            if basin_params or parameters_list:
+            if basin_params == "true" or parameters_list:
                 if not parameters_list:
                     parameters_list = ''
                 try:
                     messages.addMessage('Calculating Basin Characteristics')
                     ssBp = BasinParameters(stabbr, workspaceID, parameters_list, "none")
-                
                 
                     if ssBp.isComplete:
                         params = []
@@ -702,3 +698,63 @@ class basinParams(object):
                 messages.addErrorMessage('Please make sure the basin is in the given region.  If computation still fails, try again in another map document or ArcMap session.')
             arcpy.ResetEnvironments()
             arcpy.ClearEnvironment("workspace")
+
+class parseXMLTest(object):
+    # region Constructor
+    def __init__(self):
+        self.label = "Testing Parsing XML"
+        self.description = ""
+
+    def getParameterInfo(self):
+        # Define parameter definitions
+
+        state_folder = arcpy.Parameter(
+            displayName="Select input state/region folder",
+            name="state_folder",
+            datatype="DEFolder",
+            parameterType="Required",
+            direction="Input")
+
+        workspaceID = arcpy.Parameter(
+            displayName="Workspace folder",
+            name="workspaceID",
+            datatype="DEFolder",
+            parameterType="Required",
+            direction="Input")
+        
+        xml_file = arcpy.Parameter(
+            displayName="XML File",
+            name="xmlfile",
+            datatype="DEFile",
+            parameterType="Required",
+            direction="Input")
+
+        parameters = [state_folder, workspaceID, xml_file] 
+        return parameters
+    
+    def isLicensed(self):
+        return True
+
+    def updateParameters(self, parameters):
+        return
+
+    def UpdateMessages(self, parameters):
+        return
+
+    def execute(self, parameters, messages): 
+        state_folder    = parameters[0].valueAsText
+        workspaceID     = parameters[1].valueAsText
+        XMLFile         = parameters[2].valueAsText
+
+        stabbr = os.path.basename(state_folder)
+
+        try:
+            messages.addMessage('Parsing XML')
+            parse = ParseXML(state_folder, stabbr, workspaceID, XMLFile)
+
+            if parse.isComplete:
+                messages.addMessage('Parsing Complete')
+
+        except:
+            tb = traceback.format_exc()
+            messages.addErrorMessage(tb)

@@ -110,7 +110,7 @@ class Delineation(object):
             self.__removePolygonHoles__(GW,featurePath)
             arcpy.CheckInExtension("Spatial")
             
-            self.__sm__("Finished")
+            self.__sm__("Finished \n")
         except:
             tb = traceback.format_exc()
             self.error = tb
@@ -171,14 +171,9 @@ class Delineation(object):
             bcLayersPath = os.path.join(self.__dataFolder__, 'bc_layers')
             xmlDoc.getElementsByTagName('RASTERDATAPATH')[0].firstChild.data = bcLayersPath
             xmlDoc.getElementsByTagName('VECTORDATAPATH')[0].firstChild.data = os.path.join(archydroPath,"global.gdb")
-            xmlDoc.getElementsByTagName('RasterLocation')[0].firstChild.data = archydroPath
-            xmlDoc.getElementsByTagName('VectorLocation')[0].firstChild.data = os.path.join(archydroPath,"global.gdb")
-            xmlDoc.getElementsByTagName('RasterLocation')[1].firstChild.data = archydroPath
-            xmlDoc.getElementsByTagName('VectorLocation')[1].firstChild.data = os.path.join(archydroPath,"global.gdb")
             xmlDoc.getElementsByTagName('DataPath')[0].firstChild.data = archydroPath
             xmlDoc.getElementsByTagName('GlobalDataPath')[0].firstChild.data = os.path.join(archydroPath,"global.gdb")
 
-            xmlDoc.getElementsByTagName('TempLocation')[0].firstChild.data = newTempWorkspace
             file = open(xmlFile,"wb")
             xmlDoc.writexml(file)
 
