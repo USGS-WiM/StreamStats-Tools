@@ -15,7 +15,7 @@ class Toolbox(object):
         self.alias  = "ss-tools"
 
         # List of tool classes associated with this toolbox
-        self.tools = [updateS3Bucket, basinDelin, basinParams] 
+        self.tools = [basinDelin, basinParams] 
 
 class updateS3Bucket(object):
     def __init__(self):
@@ -206,7 +206,7 @@ class updateS3Bucket(object):
             """
 
             filename = item.replace('\\','/').split('/')[-1]
-            stateabbr = filename.split('_ss.gdb')[0]
+            stateabbr = filename.split('_ss.gdb')[0].upper()
 
             #validate file gdb
             if os.path.isdir(item) and filename.find('gdb') and stateabbr in states:
@@ -604,7 +604,8 @@ class basinDelin(object):
         else:
             if ssdel.error != "":
                 messages.addErrorMessage('Delineation Error ' + ssdel.error)
-            messages.addErrorMessage('Delination Failed. Please make sure the point is in the given region.  If delineation still fails, try again in another map document or ArcMap session.')
+            if "no cataloguing unit" in ssdel.error:
+                messages.addErrorMessage('Delination Failed. Please make sure the point is in the given region.  If delineation still fails, try again in another map document or ArcMap session.')
         arcMessages = arcpy.GetMessages()
         if arcMessages.find('ERROR') > -1 or arcMessages.find('Failed') > -1:
             messages.addGPMessages()

@@ -69,6 +69,9 @@ class ParseXML(object):
             wshLayers = self.__getWshLayers__(xmlPath) #get layers necessary for basin characteristics
             delinLayers = self.__getDelinLayers__(xmlPath) #get layers necessary for delineation
             layers = wshLayers + delinLayers
+            seperator = ';'
+            lays = seperator.join(layers)
+            self.__sm__('layers: ' + lays)
 
             self.__deleteFiles__(stateFolder, layers) #uses layers taken from xml to delete unnecessary files
             self.isComplete = True
@@ -95,8 +98,12 @@ class ParseXML(object):
         xmlDoc = ET.parse(xmlfile)
         for apLayer in xmlDoc.findall(".//ApFunction[@TagName='WshParams']/ApFields/ApField/ApLayers/ApLayer", xmlDoc):
             layerName = apLayer.get('Name').lower()
-            layerAlName = apLayer.get('AliasName').lower()
-            wshLayers.extend((layerName,layerAlName))
+            if apLayer.get('AliasName'):
+                layerAlName = apLayer.get('AliasName').lower()
+                if layerAlName not in wshLayers:
+                    wshLayers.append(layerAlName)
+            if layerName not in wshLayers:
+                wshLayers.append(layerName)
         return wshLayers
     def __getDelinLayers__(self, xmlfile):
         delinLayers = []
