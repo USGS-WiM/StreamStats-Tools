@@ -48,6 +48,9 @@ class BasinParameters(object):
         self.__xmlPath__ = os.path.join(self.__TempLocation__, "StreamStats"+regionID+".xml")
         self.ParameterList = None
 
+        if not arcpy.Exists(self.__TempLocation__):
+            os.makedirs(self.__TempLocation__)
+
         logdir = os.path.join(self.__TempLocation__, 'parameter.log')
 
         formatter = logging.Formatter('%(asctime)s %(message)s')
@@ -189,11 +192,7 @@ class BasinParameters(object):
                 archydroPath = os.path.join(self.__dataFolder__, 'archydro')
                 bcLayersPath = os.path.join(self.__dataFolder__, 'bc_layers')
                 xmlDoc.getElementsByTagName('RASTERDATAPATH')[0].firstChild.data = bcLayersPath
-                xmlDoc.getElementsByTagName('VECTORDATAPATH')[0].firstChild.data = bcLayersPath
-                xmlDoc.getElementsByTagName('RasterLocation')[0].firstChild.data = archydroPath
-                xmlDoc.getElementsByTagName('VectorLocation')[0].firstChild.data = os.path.join(archydroPath,"global.gdb")
-                xmlDoc.getElementsByTagName('RasterLocation')[1].firstChild.data = archydroPath
-                xmlDoc.getElementsByTagName('VectorLocation')[1].firstChild.data = os.path.join(archydroPath,"global.gdb")
+                xmlDoc.getElementsByTagName('VECTORDATAPATH')[0].firstChild.data = os.path.join(archydroPath,"global.gdb")
                 xmlDoc.getElementsByTagName('DataPath')[0].firstChild.data = archydroPath
                 xmlDoc.getElementsByTagName('GlobalDataPath')[0].firstChild.data = os.path.join(archydroPath,"global.gdb")
                 

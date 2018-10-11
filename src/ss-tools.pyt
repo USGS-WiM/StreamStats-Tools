@@ -669,10 +669,6 @@ class basinParams(object):
         stabbr = os.path.basename(state_folder)
 
         tempDir = os.path.join(workspaceID, 'Temp')
-        xmlLoc = os.path.join(tempDir, 'StreamStats' + stabbr + '.xml')
-        if not arcpy.Exists(xmlLoc):
-            messages.addErrorMessage('Regional xml: "' + xmlLoc + '" not found.')
-            sys.exit()
 
         try:
             messages.addMessage('Calculating Basin Characteristics')

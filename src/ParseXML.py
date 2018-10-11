@@ -124,12 +124,12 @@ class ParseXML(object):
                 filename = os.path.splitext(name)[0].lower()
                 filePath = os.path.join(root,name)
                 fileDir = os.path.basename(os.path.dirname(filePath)).lower()
-                if all([not fileDir.startswith('0'),fileDir not in layers,filename not in layers,not filename.endswith(".aux"),os.path.dirname(filePath) != os.path.join(stateFolder, "bc_layers","info")]) or name.endswith('.mdb'):
+                if all([not filePath.endswith('.gdb'), not fileDir.endswith('.gdb'),fileDir not in layers,filename not in layers,filename[:-4] not in layers,os.path.dirname(filePath) != os.path.join(stateFolder, "bc_layers","info")]) or name.endswith('.mdb'):
                     #bc_layers\info folder inputs raster tables, affects basin chars for some regions if not there
                     if os.path.dirname(filePath) not in fileDirs:
                         fileDirs.append(os.path.dirname(filePath))
                     os.remove(filePath)
-            for folder in dirs:
+            for folder in dirs: #not doing anything unless empty because of check for '.gdb' ending
                 if folder.lower().endswith('.gdb'):
                     folderPath = os.path.join(root,folder)
                     arcpy.env.workspace = folderPath
