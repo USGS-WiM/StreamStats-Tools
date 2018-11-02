@@ -5,7 +5,7 @@ from arcpy import env
 from arcpy.sa import *
 from Delineation import Delineation as Delineation
 from BasinParameters import BasinParameters as BasinParameters
-from ParseXML import ParseXML as ParseXML
+from UpdateS3 import Main as UpdateS3
 import time
 import json
 
@@ -15,7 +15,7 @@ class Toolbox(object):
         self.alias  = "ss-tools"
 
         # List of tool classes associated with this toolbox
-        self.tools = [basinDelin, basinParams] 
+        self.tools = [basinDelin, basinParams, updateS3Bucket] 
 
 class updateS3Bucket(object):
     def __init__(self):
@@ -53,11 +53,26 @@ class updateS3Bucket(object):
             parameterType="Required",
             direction="Input")
         
+        workspace = arcpy.Parameter(
+            displayName = "Temporary Workspace",
+            name="workspace",
+            datatype="DEFolder",
+            parameterType="Required",
+            direction="Input"
+        )
+        
         state_folder = arcpy.Parameter(
             displayName="Select input state/region folder",
             name="state_folder",
             datatype="DEFolder",
-            parameterType="Required",
+            parameterType="Optional",
+            direction="Input")
+
+        xml_file = arcpy.Parameter(
+            displayName="Select xml file",
+            name="xml_files",
+            datatype="DEFile",
+            parameterType="Optional",
             direction="Input")
         
         copy_bc_layers = arcpy.Parameter(
@@ -89,13 +104,6 @@ class updateS3Bucket(object):
             direction="Input",
             multiValue="True")
 
-        xml_file = arcpy.Parameter(
-            displayName="Select xml file",
-            name="xml_files",
-            datatype="DEFile",
-            parameterType="Optional",
-            direction="Input")
-
         schema_file = arcpy.Parameter(
             displayName="Select schema FGDB file",
             name="schema_files",
@@ -103,7 +111,7 @@ class updateS3Bucket(object):
             parameterType="Optional",
             direction="Input")
         
-        parameters = [log_Note, access_key_id, access_key, editor_name, state_folder, copy_bc_layers, copy_archydro, copy_global, huc_folders, xml_file, schema_file]
+        parameters = [log_Note, access_key_id, access_key, editor_name, workspace, state_folder, xml_file, copy_bc_layers, copy_archydro, copy_global, huc_folders, schema_file]
     
         return parameters
 
@@ -120,291 +128,22 @@ class updateS3Bucket(object):
 
         return
 
-    def updateMessages(self, parameters): #optional
+    def updateMessages(self, parameters):
         if parameters[1].altered:
             logNote = parameters[1].valueAsText
             if len(logNote) > 50:
                 pythonaddins.MessageBox('Note cannot exceed 50 characters', 'WARNING', 0)
-        if not parameters[8].altered:
-            parameters[8].value = ''
-        if parameters[7].value == True or parameters[8].valueAsText:
-            parameters[6].value = False
+        if not parameters[10].altered:
+            parameters[10].value = ''
+        if parameters[9].value == True or parameters[10].valueAsText:
+            parameters[8].value = False
         return
 
     def execute(self, parameters, messages):
-        logNote        = parameters[0].valueAsText
-        accessKeyID    = parameters[1].valueAsText
-        accessKey      = parameters[2].valueAsText
-        editorName     = parameters[3].valueAsText
-        state_folder   = parameters[4].valueAsText
-        copy_bc_layers = parameters[5].valueAsText
-        copy_archydro  = parameters[6].valueAsText
-        copy_global    = parameters[7].valueAsText
-        huc_folders    = parameters[8].valueAsText
-        xml_file       = parameters[9].valueAsText
-        schema_file    = parameters[10].valueAsText
-        
-        arcpy.env.overwriteOutput = True
 
-        def configureAWSKeyID(AWSKeyID):
-            """configureAWSKeyID(AWSKeyID=None)
-                Function to configure AWS Access Key ID
-            """
+        messages.addMessage('Running script to update S3')
 
-            #create AWS CLI command
-            cmd="aws configure set aws_access_key_id " + AWSKeyID
-
-
-            try:
-                output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
-            except subprocess.CalledProcessError as e:
-                #messages.addErrorMessage('Configure not successful.  Please make sure you have inserted the correct credentials.')
-                messages.addErrorMessage(e.output)
-                tb = traceback.format_exc()
-                messages.addErrorMessage(tb)
-                sys.exit()
-            else:
-                messages.addMessage('Finished configuring AWS Key ID')
-        def configureAWSKey(AWSAccessKey):
-            """configureAWSKey(AWSAccessKey=None)
-                Function to configure AWS CLI Access Key
-            """
-
-            #create AWS CLI command
-            cmd="aws configure set aws_secret_access_key " + AWSAccessKey
-
-
-            try:
-                output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
-            except subprocess.CalledProcessError as e:
-                #messages.addErrorMessage('Configure not successful.  Please make sure you have entered the correct credentials.')
-                messages.addErrorMessage(e.output)
-                tb = traceback.format_exc()
-                messages.addErrorMessage(tb)
-                sys.exit()
-            else:
-                messages.addMessage('Finished configuring AWS Secret Access Key')
-        def validateStreamStatsXML(xml):
-            """validateStreamStatsXML(xml=None)
-                Determines if input xml is a valid streamstats XML file
-            """
-
-            #get filename
-            filename = xml.replace('\\','/').split('/')[-1]
-
-            #validate xml file
-            stateabbr = filename.split('.xml')[0].split('StreamStats')[1].upper()
-            if fnmatch.fnmatch(filename, 'StreamStats*.xml') and stateabbr in states:
-                return True
-            else:
-                messages.addErrorMessage('You did not select a valid xml file: ' + filename)
-                sys.exit()
-                
-        def validateStreamStatsSchema(item):
-            """validateStreamStatsSchema(item=None)
-                Determines if input schema is either a valid .prj file or a valid file geodatabse
-            """
-
-            filename = item.replace('\\','/').split('/')[-1]
-            stateabbr = filename.split('_ss.gdb')[0].upper()
-
-            #validate file gdb
-            if os.path.isdir(item) and filename.find('gdb') and stateabbr in states:
-                try:
-                    desc = arcpy.Describe(item)
-                    if desc.dataType == 'Workspace':
-                        messages.addMessage('Found a valid file geodatabase: ' + filename + ', item: ' + item )
-                        return 'fgdb'
-                except:
-                    messages.addErrorMessage('You did not select a valid file geodatabase: ' + filename)
-
-            else:
-                messages.addErrorMessage('You did not select a valid schema: ' + item)
-                sys.exit()
-
-        def validateStreamStatsDataFolder(folder=None,subfolder=None):
-            """validateStreamStatsDataFolder(folder=None,subfolder=None)
-                Determines if input state/region data folder is valid
-            """
-
-            state = os.path.basename(folder).lower()
-
-            #validate state
-            if state.upper() not in states:
-                messages.addErrorMessage('You did not select a valid state folder: ' + folder)
-                sys.exit()
-            if os.path.isdir(folder + '/' + subfolder):
-                return True
-            else:
-                messages.addWarningMessage('Subfolder does not exist: ' + subfolder)
-        
-        def copyS3(source=None,destination=None,args=None, log=False):
-            """copyS3(source=None,destination=None,args=None)
-                Function to call AWS CLI tools copy source file or folder to and from s3 with error trapping
-            """
-            if args == None:
-                args = ""
-            
-            if checkS3Bucket(destination) and not log:
-                #delete destination folder first
-                cmd="aws s3 rm " + destination +  " " + args
-
-                try:
-                    output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
-                except subprocess.CalledProcessError as e:
-                    #messages.addErrorMessage('Make sure AWS CLI has been installed, and you have run "aws configure" to store credentials')
-                    messages.addErrorMessage(e.output)
-                    tb = traceback.format_exc()
-                    messages.addErrorMessage(tb)
-                    sys.exit()
-
-            #create AWS CLI command
-            cmd="aws s3 cp " + source + " " + destination +  " " + args
-
-            messages.addMessage('Copying ' + source + ' to ' + destination + '...')
-
-            try:
-                output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
-            except subprocess.CalledProcessError as e:
-                #messages.addErrorMessage('Make sure AWS CLI has been installed, and you have run "aws configure" to store credentials')
-                messages.addErrorMessage(e.output)
-                tb = traceback.format_exc()
-                messages.addErrorMessage(tb)
-                sys.exit()
-
-        def checkS3Bucket(fileLocation=None):
-            """checkS3Bucket(fileLocation=None)
-                function to check for existence of log file in s3 bucket
-            """
-
-            cmd = "aws s3 ls " + fileLocation + " | wc -l"
-            try:
-                output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
-                if '0' in output:
-                    return 'False'
-                else:
-                    return 'True'
-
-            except subprocess.CalledProcessError as e:
-                messages.addErrorMessage(e.output)
-                tb = traceback.format_exc()
-                messages.addErrorMessage(tb)
-                sys.exit()
-            else:
-                messages.addMessage('Received list of elements in bucket')
-
-        def logData(folder=None,state=None, accessKeyID=None, commands=None):
-            logFolder = os.path.join(folder, 'log')
-            logdir = os.path.join(logFolder, state.upper() + 'log.txt')
-            destFolder = destinationBucket + '/' + state.lower() + '/log'
-            destFile = destFolder + '/' + state.upper() + 'log.txt'
-
-            if checkS3Bucket(destFile) == 'True':
-                messages.addMessage('Log file found in s3, copying to folder')
-                copyS3(destFolder, logFolder, '--recursive', True)
-            else:
-                messages.addMessage('No log found, creating file')
-                if not arcpy.Exists(logFolder):
-                    os.makedirs(logFolder)
-
-            formatter = logging.Formatter('%(asctime)s %(message)s')
-            handler = logging.FileHandler(logdir)
-            logger = logging.getLogger(state + 'log')
-            logger.setLevel(logging.INFO)
-            logger.addHandler(handler)
-            formatter.converter = time.gmtime
-            handler.setFormatter(formatter)
-
-            with open(os.path.join(os.path.dirname( __file__ ), 'code.json')) as c:
-                codejson = json.load(c)
-                version = codejson[0]["version"]
-
-            logger.info('Region: ' + state.upper() + '; Repo version: ' + version + '; User: ' + user_name + '; AWS Key ID: ' + accessKeyID + '; ' + commands + 'Note: ' + logNote)
-
-            copyS3(logFolder, destFolder, '--recursive')
-
-            logging.shutdown()
-            arcpy.Delete_management(logdir)
-
-        #start main program
-        try:
-            configureAWSKeyID(accessKeyID)
-            configureAWSKey(accessKey)
-            user_name = editorName
-
-        except ImportError:
-            messages.addErrorMessage('Error using aws credentials')
-            sys.exit()
-
-        destinationBucket = 's3://streamstats-staged-data/test-data'
-
-        states = ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "CRB","DC", "DE", "DRB", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "RRB", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"]
-
-        
-        commands = 'Items Copied: '
-
-        #check for state folder input
-        if (copy_archydro or copy_bc_layers or copy_global or huc_folders) and not state_folder:
-            messages.addWarningMessage('Make sure you input a state folder, then try again.')
-            sys.exit()
-        if state_folder:
-            messages.addMessage('Folder: ' + state_folder)
-
-            state = os.path.basename(state_folder).lower()
-            messages.addMessage('Processing: ' + state)
-                
-            if copy_archydro == 'true' and validateStreamStatsDataFolder(state_folder, 'archydro'):
-                copyS3(state_folder + '/archydro',destinationBucket + '/' + state.lower() + '/archydro', '--recursive')
-                commands += 'archydro, '
-
-            if copy_bc_layers == 'true' and validateStreamStatsDataFolder(state_folder, 'bc_layers'):
-                copyS3(state_folder + '/bc_layers',destinationBucket + '/' + state.lower() + '/bc_layers', '--recursive')
-                commands += 'bc_layers, '
-
-            global_gdb = os.path.join(state_folder, 'archydro', 'global.gdb')
-            if copy_global and os.path.isdir(global_gdb):
-                messages.addMessage('Copying global.gdb')
-                copyS3(global_gdb, destinationBucket + '/' + state.lower() + '/archydro/global.gdb', '--recursive')
-                commands += 'global.gdb, '
-            if huc_folders:
-                huc_folders = huc_folders.split(';')
-                for huc_folder in huc_folders:
-                    if '/' in huc_folder: #not the best way to do it
-                        huc_folder = huc_folder
-                    else:
-                        huc_folder = os.path.join(state_folder,'archydro', huc_folder)
-                    if os.path.isdir(huc_folder):
-                        huc_id = os.path.basename(huc_folder)
-                        copyS3(huc_folder, destinationBucket + '/' + state.lower() + '/archydro/' + huc_id, '--recursive')
-                        commands += 'huc ' + huc_id + ', '
-                    else:
-                        messages.addMessage('Huc folder not found: ' + huc_id)
-
-        #check for xml file input
-        if xml_file:
-            messages.addMessage('Now processing xml')
-            if arcpy.Exists(xml_file) and validateStreamStatsXML(xml_file):
-                filename = xml_file.replace('\\','/').split('/')[-1]
-                state = filename.split('.xml')[0].split('StreamStats')[1]
-                copyS3(xml_file, destinationBucket + '/' + state.lower() + '/' + filename, '')
-                commands += 'xml, '
-            else:
-                messages.addWarningMessage("There is no valid .xml file.  File should be named 'Streamstats" + state + ".xml'.")
-                sys.exit()
-
-        #check for schema file input
-        if schema_file:
-            messages.addMessage('Now processing schema')
-            schemaType = validateStreamStatsSchema(schema_file)
-            rootname = schema_file.replace('\\','/').split('/')[-1]
-            state = rootname.split('_ss.gdb')[0].lower()
-
-            if schemaType == 'fgdb':
-                copyS3(schema_file, destinationBucket + '/' + state.lower() + '/' + rootname, '--recursive')
-                commands += 'schema, '
-
-            
-        logData(state_folder,state, accessKeyID, commands)
+        updates3 = UpdateS3(parameters) 
 
 class basinDelin(object):
     # region Constructor
@@ -475,6 +214,11 @@ class basinDelin(object):
     def updateParameters(self, parameters):
         if not parameters[5].altered:
             parameters[5].value = '4326'
+        parameters[0].value = r'C:\Users\kjacobsen\Documents\wim_projects\ss_data\vt'
+        parameters[1].value = r'C:\Users\kjacobsen\Documents\wim_projects\ss_data\vt\VT_ss.gdb'
+        parameters[2].value = r'C:\Users\kjacobsen\Documents\wim_projects\ss_data\vt\StreamStatsVT.xml'
+        parameters[3].value = r'C:\Users\kjacobsen\Documents\wim_projects\ss_data\workspaces\delin_vt1'
+        parameters[4].value = '[-73.15191, 43.08356]'
         return
 
     def UpdateMessages(self, parameters):
@@ -695,63 +439,3 @@ class basinParams(object):
                 messages.addErrorMessage('Please make sure the basin is in the given region.  If computation still fails, try again in another map document or ArcMap session.')
             arcpy.ResetEnvironments()
             arcpy.ClearEnvironment("workspace")
-
-class parseXMLTest(object):
-    # region Constructor
-    def __init__(self):
-        self.label = "Testing Parsing XML"
-        self.description = ""
-
-    def getParameterInfo(self):
-        # Define parameter definitions
-
-        state_folder = arcpy.Parameter(
-            displayName="Select input state/region folder",
-            name="state_folder",
-            datatype="DEFolder",
-            parameterType="Required",
-            direction="Input")
-
-        workspaceID = arcpy.Parameter(
-            displayName="Workspace folder",
-            name="workspaceID",
-            datatype="DEFolder",
-            parameterType="Required",
-            direction="Input")
-        
-        xml_file = arcpy.Parameter(
-            displayName="XML File",
-            name="xmlfile",
-            datatype="DEFile",
-            parameterType="Required",
-            direction="Input")
-
-        parameters = [state_folder, workspaceID, xml_file] 
-        return parameters
-    
-    def isLicensed(self):
-        return True
-
-    def updateParameters(self, parameters):
-        return
-
-    def UpdateMessages(self, parameters):
-        return
-
-    def execute(self, parameters, messages): 
-        state_folder    = parameters[0].valueAsText
-        workspaceID     = parameters[1].valueAsText
-        XMLFile         = parameters[2].valueAsText
-
-        stabbr = os.path.basename(state_folder)
-
-        try:
-            messages.addMessage('Parsing XML')
-            parse = ParseXML(state_folder, stabbr, workspaceID, XMLFile)
-
-            if parse.isComplete:
-                messages.addMessage('Parsing Complete')
-
-        except:
-            tb = traceback.format_exc()
-            messages.addErrorMessage(tb)
