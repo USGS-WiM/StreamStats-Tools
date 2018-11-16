@@ -214,11 +214,6 @@ class basinDelin(object):
     def updateParameters(self, parameters):
         if not parameters[5].altered:
             parameters[5].value = '4326'
-        parameters[0].value = r'C:\Users\kjacobsen\Documents\wim_projects\ss_data\vt'
-        parameters[1].value = r'C:\Users\kjacobsen\Documents\wim_projects\ss_data\vt\VT_ss.gdb'
-        parameters[2].value = r'C:\Users\kjacobsen\Documents\wim_projects\ss_data\vt\StreamStatsVT.xml'
-        parameters[3].value = r'C:\Users\kjacobsen\Documents\wim_projects\ss_data\workspaces\delin_vt1'
-        parameters[4].value = '[-73.15191, 43.08356]'
         return
 
     def UpdateMessages(self, parameters):

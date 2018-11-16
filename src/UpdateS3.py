@@ -93,8 +93,8 @@ class Main(object):
 
         self.states = ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "CRB","DC", "DE", "DRB", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "RRB", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"]
 
-        
-        commands = 'Items Copied: '
+
+        commands = []
         try:
             if (copy_archydro == 'true' or copy_bc_layers == 'true' or copy_global == 'true' or huc_folders) and not state_folder:
                 print 'ERROR: A state folder is required for one or more functions.'
@@ -109,11 +109,11 @@ class Main(object):
                 self.__sm__('Now processing xml: ' + xml_file)
                 filename = xml_file.replace('\\','/').split('/')[-1]
                 state = filename.split('.xml')[0].split('StreamStats')[1].upper()
-                parse = ParseXML(state_folder, state, workspace, xml_file, copy_archydro, copy_bc_layers, huc_folders)
-                xml_file = parse.__xmlPath__
-                if arcpy.Exists(xml_file) and self.__validateStreamStatsXML__(xml_file):
-                    self.__copyS3__(xml_file, destinationBucket + '/' + state.lower() + '/' + filename, '')
-                    commands += 'xml, '
+                parse = ParseData(state_folder, state, workspace, xml_file, copy_archydro, copy_bc_layers, huc_folders)
+                parse_file = parse.__xmlPath__
+                if arcpy.Exists(parse_file) and self.__validateStreamStatsXML__(xml_file):
+                    commands.append('xml')
+                    self.__copyS3__(parse_file, destinationBucket + '/' + state.lower() + '/' + filename, '')
                 else:
                     print "There is no valid .xml file.  File should be named 'Streamstats" + state + ".xml'."
                     arcpy.AddWarning("There is no valid .xml file.  File should be named 'Streamstats" + state + ".xml'.")
@@ -126,30 +126,30 @@ class Main(object):
                 state = rootname.split('_ss.gdb')[0].lower()
 
                 if schemaType == 'fgdb':
+                    commands.append('schema')
                     self.__copyS3__(schema_file, destinationBucket + '/' + state.lower() + '/' + rootname, '--recursive')
-                    commands += 'schema, '
 
             if state_folder:
                 state = os.path.basename(state_folder).lower()
                 self.__sm__('Processing: ' + state)
                 arcpy.AddMessage('Processing: ' + state)
-                if not parse:
+                if not parse_file:
                     parse = ParseData(state_folder, state, workspace, xml_file, copy_archydro, copy_bc_layers, huc_folders)
                 state_folder = parse.__stateFolder__
                 self.__sm__("new state folder: " + state_folder)
                     
                 if copy_archydro == 'true' and self.__validateStreamStatsDataFolder__(state_folder, 'archydro'):
+                    commands.append('archydro')
                     self.__copyS3__(state_folder + '/archydro',destinationBucket + '/' + state.lower() + '/archydro', '--recursive')
-                    commands += 'archydro, '
 
                 if copy_bc_layers == 'true' and self.__validateStreamStatsDataFolder__(state_folder, 'bc_layers'):
+                    commands.append('bc_layers')
                     self.__copyS3__(state_folder + '/bc_layers',destinationBucket + '/' + state.lower() + '/bc_layers', '--recursive')
-                    commands += 'bc_layers, '
 
                 global_gdb = os.path.join(state_folder, 'archydro', 'global.gdb')
                 if copy_global == 'true' and os.path.isdir(global_gdb):
+                    commands.append('global.gdb')
                     self.__copyS3__(global_gdb, destinationBucket + '/' + state.lower() + '/archydro/global.gdb', '--recursive')
-                    commands += 'global.gdb, '
                 if huc_folders:
                     huc_folders = huc_folders.split(';')
                     for huc_folder in huc_folders:
@@ -159,15 +159,15 @@ class Main(object):
                             huc_folder = os.path.join(state_folder,'archydro', huc_folder)
                         if os.path.isdir(huc_folder):
                             huc_id = os.path.basename(huc_folder)
+                            commands.append('huc ' + huc_id)
                             self.__copyS3__(huc_folder, destinationBucket + '/' + state.lower() + '/archydro/' + huc_id, '--recursive')
-                            commands += 'huc ' + huc_id + ', '
                         else:
                             print 'Huc folder not found: ' + huc_folder
                             arcpy.AddError('Huc folder not found: ' + huc_folder)
-                parse.__checkPixelDepth(state_folder)
+                parse.__checkPixelDepth__(state_folder)
 
-            
-
+            seperator = ','
+            commands = seperator.join(commands)
                 
             self.__logData__(destinationBucket, workspace,state, accessKeyID, commands, user_name, logNote)
 
@@ -289,9 +289,9 @@ class Main(object):
             try:
                 output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
             except subprocess.CalledProcessError as e:
-                arcpy.AddError('Make sure AWS CLI has been installed')
                 tb = traceback.format_exc()
                 if 'lock' not in e.output and 'exit status 2' not in tb:
+                    arcpy.AddError('Make sure AWS CLI has been installed')
                     print e.output
                     arcpy.AddError(e.output)
                     print tb
@@ -309,8 +309,8 @@ class Main(object):
             output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
             tb = traceback.format_exc()
-            arcpy.AddError('Make sure AWS CLI has been installed')
             if 'lock' not in e.output and 'exit status 2' not in tb:
+                arcpy.AddError('Make sure AWS CLI has been installed')
                 print e.output
                 arcpy.AddError(e.output)
                 print tb
@@ -365,7 +365,7 @@ class Main(object):
             codejson = json.load(c)
             version = codejson[0]["version"]
 
-        logger.info('Region: ' + state.upper() + '; Repo version: ' + version + '; User: ' + username + '; AWS Key ID: ' + accessKeyID + '; ' + commands + 'Note: ' + logNote)
+        logger.info('Region: ' + state.upper() + '; Repo version: ' + version + '; User: ' + username + '; AWS Key ID: ' + accessKeyID + '; Items Copied: ' + commands + '; Note: ' + logNote)
 
         self.__copyS3__(logFolder, destFolder, '--recursive')
         logging.shutdown()
@@ -414,4 +414,4 @@ if __name__ == '__main__':
     parameters = []
     parameters.extend((args.logNote, args.accessKeyID, args.accessKey, args.editorName, args.workspace, args.state_folder, args.xml_file ,args.copy_bc_layers, 
         args.copy_archydro,args.copy_global, args.huc_folders, args.schema_file))
-    Main(args)    
+    Main(parameters)    
