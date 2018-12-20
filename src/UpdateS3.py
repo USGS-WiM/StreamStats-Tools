@@ -109,7 +109,7 @@ class Main(object):
                 self.__sm__('Now processing xml: ' + xml_file)
                 filename = xml_file.replace('\\','/').split('/')[-1]
                 state = filename.split('.xml')[0].split('StreamStats')[1].upper()
-                parse = ParseData(state_folder, state, workspace, xml_file, copy_archydro, copy_bc_layers, huc_folders)
+                parse = ParseData(state_folder, state, workspace, xml_file, copy_archydro, copy_bc_layers, huc_folders, 'upload')
                 parse_file = parse.__xmlPath__
                 if arcpy.Exists(parse_file) and self.__validateStreamStatsXML__(xml_file):
                     commands.append('xml')
@@ -134,7 +134,7 @@ class Main(object):
                 self.__sm__('Processing: ' + state)
                 arcpy.AddMessage('Processing: ' + state)
                 if not parse_file:
-                    parse = ParseData(state_folder, state, workspace, xml_file, copy_archydro, copy_bc_layers, huc_folders)
+                    parse = ParseData(state_folder, state, workspace, xml_file, copy_archydro, copy_bc_layers, huc_folders, 'upload')
                 state_folder = parse.__stateFolder__
                 self.__sm__("new state folder: " + state_folder)
                     
@@ -282,7 +282,7 @@ class Main(object):
         if args == None:
             args = ""
         
-        if not log and self.__checkS3Bucket__(destination):
+        if not log and self.__checkS3Bucket__(destination) == "True":
             #delete destination folder first
             cmd="aws s3 rm " + destination +  " " + args
 

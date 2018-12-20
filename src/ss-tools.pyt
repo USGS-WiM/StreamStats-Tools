@@ -6,6 +6,7 @@ from arcpy.sa import *
 from Delineation import Delineation as Delineation
 from BasinParameters import BasinParameters as BasinParameters
 from UpdateS3 import Main as UpdateS3
+from PullFromS3 import Main as PullFromS3
 import time
 import json
 
@@ -15,7 +16,7 @@ class Toolbox(object):
         self.alias  = "ss-tools"
 
         # List of tool classes associated with this toolbox
-        self.tools = [basinDelin, basinParams, updateS3Bucket] 
+        self.tools = [basinDelin, basinParams, updateS3Bucket, pullS3] 
 
 class updateS3Bucket(object):
     def __init__(self):
@@ -434,3 +435,131 @@ class basinParams(object):
                 messages.addErrorMessage('Please make sure the basin is in the given region.  If computation still fails, try again in another map document or ArcMap session.')
             arcpy.ResetEnvironments()
             arcpy.ClearEnvironment("workspace")
+
+class pullS3(object):
+    def __init__(self):
+        self.label       = "Pull regional data from S3"
+        self.description = ""
+
+    def getParameterInfo(self):
+        #Define parameter definitions
+
+        region_id = arcpy.Parameter(
+            displayName="Region ID/Abbreviation",
+            name="region_id",
+            datatype="GPString",
+            parameterType="Required",
+            direction="Input"
+        )
+        access_key_id = arcpy.Parameter(
+            displayName="Your AWS Access Key ID",
+            name="access_key_id",
+            datatype="GPString",
+            parameterType="Required",
+            direction="Input")
+
+        access_key = arcpy.Parameter(
+            displayName="Your AWS Secret Access Key",
+            name="access_key",
+            datatype="GPString",
+            parameterType="Required",
+            direction="Input")
+        
+        workspace = arcpy.Parameter(
+            displayName = "Data Location",
+            name="workspace",
+            datatype="DEFolder",
+            parameterType="Required",
+            direction="Input"
+        )
+        
+        copy_whole = arcpy.Parameter(
+            displayName="Copy whole regional folder",
+            name="copy_whole",
+            datatype="GPBoolean",
+            parameterType="Optional",
+            direction="Input"
+        )
+
+        copy_whole_archydro = arcpy.Parameter(
+            displayName="Copy whole 'archydro' folder",
+            name="copy_whole_archydro",
+            datatype="GPBoolean",
+            parameterType="Optional",
+            direction="Input"
+        )
+
+        copy_global = arcpy.Parameter(
+            displayName="Copy 'global.gdb' from 'archydro' folder",
+            name="copy_global",
+            datatype="GPBoolean",
+            parameterType="Optional",
+            direction="Input"
+        )
+
+        huc_folders = arcpy.Parameter(
+            displayName="Input huc IDs",
+            name="huc_folders",
+            datatype="GPString",
+            parameterType="Optional",
+            direction="Input")
+        
+        copy_bc_layers = arcpy.Parameter(
+            displayName="Copy 'bc_layers' folder",
+            name="copy_bc_layers",
+            datatype="GPBoolean",
+            parameterType="Optional",
+            direction="Input"
+        )
+
+        copy_xml = arcpy.Parameter(
+            displayName="Copy '.xml' file",
+            name="copy_xml",
+            datatype="GPBoolean",
+            parameterType="Optional",
+            direction="Input"
+        )
+
+        copy_schema = arcpy.Parameter(
+            displayName="Copy 'schema' folder",
+            name="copy_schema",
+            datatype="GPBoolean",
+            parameterType="Optional",
+            direction="Input"
+        )
+
+        
+        parameters = [region_id, access_key_id, access_key, workspace, copy_whole, copy_whole_archydro, copy_global, huc_folders, copy_bc_layers, copy_xml, copy_schema]
+    
+        return parameters
+
+    def isLicensed(self): #optional
+        return True
+
+    def updateParameters(self, parameters): #optional
+
+        #if we have an input folder, set checkboxes true
+        # if parameters[0].valueAsText:
+        #     if parameters[0].altered:
+        #         parameters[1].value = "True"
+        #         parameters[2].value = "True"
+
+        return
+
+    def updateMessages(self, parameters):
+        if not parameters[7].altered:
+            parameters[7].value = ''
+        if parameters[6].value == True or parameters[7].valueAsText:
+            parameters[5].value = False
+        if any([parameters[5].value == True, parameters[7].valueAsText, parameters[6].value == True, parameters[8].value == True, parameters[9].value == True, parameters[10].value == True]):
+            parameters[4].value = False
+        return
+
+    def execute(self, parameters, messages):
+
+        messages.addMessage('Running script to pull from S3')
+        try:
+            PullFromS3(parameters)
+        except:
+            tb = traceback.format_exc()
+            messages.addErrorMessage(tb)

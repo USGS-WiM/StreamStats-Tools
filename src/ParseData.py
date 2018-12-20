@@ -33,7 +33,7 @@ import shutil
 
 class Main(object):
     #region Constructor
-    def __init__(self, stateFolder, regionID, workspaceID, xml, copy_archydro, copy_bc_layers, huc_folders): 
+    def __init__(self, stateFolder, regionID, workspaceID, xml, copy_archydro, copy_bc_layers, huc_folders, direction): 
         self.RegionID = regionID
         self.isComplete = False
         self.Message =""
@@ -51,12 +51,12 @@ class Main(object):
         self.__logger__.addHandler(handler)
         handler.setFormatter(formatter)
         
-        self.__run__(xml, stateFolder, self.__TempLocation__, copy_archydro, copy_bc_layers, huc_folders)  
+        self.__run__(xml, stateFolder, self.__TempLocation__, copy_archydro, copy_bc_layers, huc_folders, direction)  
             
     #endregion  
          
     #Private Methods
-    def __run__(self, xmlPath, stateFolder, tempLoc, copy_archydro, copy_bc_layers, huc_folders):
+    def __run__(self, xmlPath, stateFolder, tempLoc, copy_archydro, copy_bc_layers, huc_folders, direction):
         try:
             self.__sm__('initialized')
             if xmlPath:
@@ -74,10 +74,9 @@ class Main(object):
                     wshLayers = self.__getXMLLayers__(xmlPath, "wsh") #get layers necessary for basin characteristics
                     delinLayers = self.__getXMLLayers__(xmlPath, "delin") #get layers necessary for delineation
                     layers = wshLayers + delinLayers
-                    seperator = ';'
-                    lays = seperator.join(layers)
 
-                    stateFolder = self.__copydata__(stateFolder, tempLoc, copy_archydro, copy_bc_layers, huc_folders)
+                    if direction == 'upload':
+                        stateFolder = self.__copydata__(stateFolder, tempLoc, copy_archydro, copy_bc_layers, huc_folders)
 
                     self.__deleteFiles__(stateFolder, layers) #uses layers taken from xml to delete unnecessary files
                     arcpy.ResetEnvironments()
@@ -150,7 +149,7 @@ class Main(object):
     def __deleteFiles__(self, stateFolder, layers):
         # remove unnecessary files from state folders using layer names parsed from xml
         fileDirs = []
-        layers.extend(('global.gdb', 'schema', 'streamstats' + self.RegionID, self.RegionID + '_ss.gdb', 'readme'))
+        layers.extend(('global.gdb', 'schema', 'streamstats' + self.RegionID, self.RegionID + '_ss.gdb', 'readme', 'xml'))
         seperator = ';'
         lays = seperator.join(layers)
         self.__sm__('Layers to Keep: ' + lays)
@@ -172,7 +171,7 @@ class Main(object):
                         self.__sm__('deleted: ' + os.path.join(root, d))
                     except:
                         self.__sm__('could not remove ' + d)
-                else: # remove unnecessary feature classes from all gdbs
+                elif '_ss.gdb' not in d: # remove unnecessary feature classes from all gdbs
                     folderPath = os.path.join(root,d, 'Layers')
                     arcpy.env.workspace = folderPath
                     fclasses = arcpy.ListFeatureClasses()
