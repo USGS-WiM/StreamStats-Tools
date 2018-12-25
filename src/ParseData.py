@@ -42,11 +42,11 @@ class Main(object):
         if not os.path.exists(self.__TempLocation__): 
             os.makedirs(self.__TempLocation__)
 
-        logdir = os.path.join(self.__TempLocation__, 'parseXML.log')
+        logdir = os.path.join(self.__TempLocation__, 'parse_{0}.log'.format(regionID))
 
         formatter = logging.Formatter('%(asctime)s %(message)s')
         handler = logging.FileHandler(logdir)
-        self.__logger__ = logging.getLogger('parseXML')
+        self.__logger__ = logging.getLogger('parse_{0}'.format(regionID))
         self.__logger__.setLevel(logging.INFO)
         self.__logger__.addHandler(handler)
         handler.setFormatter(formatter)
@@ -63,8 +63,11 @@ class Main(object):
                 arcpy.AddMessage('Parsing xml')
                 shutil.copy(xmlPath, tempLoc)
                 xmlPath = os.path.join(tempLoc, os.path.basename(xmlPath))
-                self.__thinXML__(xmlPath, "StreamStatsConfig", 0, "ProgParams") #removes unnecessary nodes from xml
-                self.__thinXML__(xmlPath, "ProgParams", 0, "ApFunctions")
+                try:
+                    self.__thinXML__(xmlPath, "StreamStatsConfig", 0, "ProgParams") #removes unnecessary nodes from xml
+                except:
+                    self.__thinXML__(xmlPath, "StreamStatsConfig" + os.path.basename(stateFolder).upper(), 0, "ProgParams") #removes unnecessary nodes from xml
+                self.__thinXML__(xmlPath, "ProgParams", 0, {"ApFunctions", "TempLocation"})
                 self.__thinXML__(xmlPath, "ApFunctions", 0, {"GlobalPointDelineation", "WshParams"})
                 self.__thinXML__(xmlPath, "ApFunction", 0, {"ApFields", "ApLayers", "DataPath", "GlobalDataPath", "SnapToleranceNumCells", "RASTERDATAPATH", "VECTORDATAPATH"})
                 self.__thinXML__(xmlPath, "ApFunction", 1, {"ApFields", "ApLayers", "DataPath", "GlobalDataPath", "SnapToleranceNumCells", "RASTERDATAPATH", "VECTORDATAPATH"})
@@ -78,7 +81,8 @@ class Main(object):
                     if direction == 'upload':
                         stateFolder = self.__copydata__(stateFolder, tempLoc, copy_archydro, copy_bc_layers, huc_folders)
 
-                    self.__deleteFiles__(stateFolder, layers) #uses layers taken from xml to delete unnecessary files
+                    if copy_archydro == 'true' or copy_bc_layers == 'true' or huc_folders != '':
+                        self.__deleteFiles__(stateFolder, layers) #uses layers taken from xml to delete unnecessary files
                     arcpy.ResetEnvironments()
                     arcpy.ClearEnvironment("workspace")
 

@@ -101,16 +101,17 @@ class Main(object):
                 print 'ERROR: Please choose at least one thing to copy'
                 arcpy.AddError('Please choose at least one thing to copy')
                 sys.exit()
-            if regionID.upper() not in self.states:
+            if regionID.upper() not in self.states and regionID != 'all':
                 print 'ERROR: Region ID not found. Please use the region abbreviation, e.g. "AK" for Alaska'
                 arcpy.AddError('Region ID not found. Please use the region abbreviation, e.g. "AK" for Alaska')
                 sys.exit()
-
-            if regionID != 'all':
-                state = regionID
+            elif regionID != 'all':
+				self.states = [regionID]
+            
+            for state in self.states:
                 state_folder = os.path.join(workspace, state)
                 dest_state = destinationBucket + '/data/' + state.lower()
-                xml_loc =  state_folder + '/xml/StreamStats' + state.upper() + '.xml'
+                xml_loc =  state_folder + '/StreamStats' + state.upper() + '.xml'
                 dest_xml = destinationBucket +  '/xml/StreamStats' + state.upper() + '.xml'
                 self.__sm__('Processing: ' + state)
                 arcpy.AddMessage('Processing: ' + state)
@@ -130,36 +131,20 @@ class Main(object):
                         huc_path = '/archydro/' + huc_id
                         self.__copyS3__(dest_state + huc_path, state_folder + huc_path, '--recursive')
                 if copy_whole == 'true':
-                    self.__copyS3__(dest_state, state_folder, '--recursive')
+                    self.__copyS3__(dest_state + '/', state_folder, '--recursive')
                     copy_archydro = 'true'
                     copy_bc_layers = 'true'
                 if any([copy_xml == 'true', copy_archydro == 'true', copy_bc_layers == 'true', copy_whole == 'true', huc_ids]):
                     self.__copyS3__(dest_xml, xml_loc, '')
                 if copy_schema == 'true' or copy_whole == 'true':
                     schema_path = '/schemas/' + state.upper() + '_ss.gdb/'
-                    self.__copyS3__(destinationBucket + schema_path, state_folder + schema_path, '--recursive')
-                ParseData(state_folder, state, workspace, state_folder + '/xml/StreamStats' + state + '.xml' , copy_archydro, copy_bc_layers, huc_ids, 'pull')
-            elif regionID == 'all':
-                for state in self.states:
-                    self.__sm__('Processing: ' + state)
-                    arcpy.AddMessage('Processing: ' + state)
-                    destState = destinationBucket + '/' + state.lower()
-                    state_folder = os.path.join(workspace, state.lower())
-                    xml_loc =  state_folder + '/xml/StreamStats' + state.upper() + '.xml'
-                    dest_xml = destinationBucket +  '/xml/StreamStats' + state.upper() + '.xml'
-
-                    self.__copyS3__(destState, state_folder, '--recursive')
-                    self.__copyS3__(dest_xml, xml_loc, '')
-
-                    schema_path = '/schemas/' + state.upper() + '_ss.gdb/'
-                    self.__copyS3__(destinationBucket + schema_path, state_folder + schema_path, '--recursive')
-                    huc_ids = huc_ids.split(';')
-
-                    ParseData(state_folder, state, workspace, state_folder + '/xml/StreamStats' + state + '.xml', 'true', 'true', '', 'pull')
-            
-
-
-
+                    schema_path1 = '/schemas/' + state.lower() + '_ss.gdb/'
+                    schema_gdb = '/' + state.upper() + '_ss.gdb'
+                    if self.__checkS3Bucket__(destinationBucket + schema_path) == 'True':
+                        self.__copyS3__(destinationBucket + schema_path, state_folder + schema_gdb, '--recursive')
+                    elif self.__checkS3Bucket__(destinationBucket + schema_path1) == 'True':
+                        self.__copyS3__(destinationBucket + schema_path1, state_folder + schema_gdb, '--recursive')
+                ParseData(state_folder, state, workspace, xml_loc , 'true', 'true', huc_ids, 'pull')
 
             self.isComplete = True
             self.__sm__('Finished \n')
