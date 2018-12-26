@@ -89,11 +89,9 @@ class BasinParameters(object):
                 seperator = ';'
                 parameters = seperator.join(parametersList)
                 self.__sm__('parameters list: ' + parameters)
-                arcpy.AddMessage('parameters list: ' + parameters)
 
             arcpy.CheckOutExtension("Spatial")
             self.__sm__("Started calc params")
-            arcpy.AddMessage("Started calc params")
 
             if input_basin != "none":
                 if arcpy.Exists(input_basin):
@@ -109,7 +107,6 @@ class BasinParameters(object):
             self.__sm__(arcpy.GetMessages(),'AHMSG')
             arcpy.CheckInExtension("Spatial")
             self.__sm__("finished calc params")
-            arcpy.AddMessage("finished calc params")
 
             plist = self.__parseParameterXML__(outputFile.format(".xml"))
             if (len(plist) < 1):

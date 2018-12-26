@@ -269,7 +269,7 @@ class basinDelin(object):
             """validateSchema(item=None)
                 Determines if input schema is either a valid .prj file or a valid file geodatabse
             """
-            messages.addMessage('validating schema')
+
             filename = item.replace('\\','/').split('/')[-1]
 
             #validate prj file
@@ -284,7 +284,6 @@ class basinDelin(object):
 
             #validate file gdb
             elif os.path.isdir(item) and filename.find('gdb'):
-                messages.addMessage('inside gdb test')
                 try:
                     desc = arcpy.Describe(item)
                     if desc.dataType == 'Workspace':
@@ -306,7 +305,6 @@ class basinDelin(object):
                 sys.exit()
         
         messages.addMessage('Delineating Basin')
-        messages.addMessage('schema: ' + schema_file)
         schemaCheck = validateSchema(schema_file)
         xmlCheck = validateXML(xml_file)
         ppoint = validatePourPoint(pourpoint)

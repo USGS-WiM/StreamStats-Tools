@@ -179,7 +179,7 @@ class Main(object):
                     folderPath = os.path.join(root,d, 'Layers')
                     arcpy.env.workspace = folderPath
                     fclasses = arcpy.ListFeatureClasses()
-                    if fclasses:
+                    if fclasses: 
                         self.__sm__('feature classes in ' + d + ': ' + str(len(fclasses)))
                         for fc in (fc for fc in fclasses if fc.lower() not in layers):
                             try:

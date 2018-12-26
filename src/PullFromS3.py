@@ -40,7 +40,7 @@ class Main(object):
     def __init__(self, parameters):
         self.isComplete = False
         self.Message = ""
-        workspace = parameters[3].valueAsText
+        workspace = parameters[3]
 
         self.__TempLocation__ = os.path.join(workspace, "Temp")
 
@@ -62,17 +62,17 @@ class Main(object):
 
     def __run__(self, parameters):
         self.__sm__('Initialized') 
-        regionID       = parameters[0].valueAsText
-        accessKeyID    = parameters[1].valueAsText
-        accessKey      = parameters[2].valueAsText
-        workspace      = parameters[3].valueAsText
-        copy_whole     = parameters[4].valueAsText
-        copy_archydro  = parameters[5].valueAsText
-        copy_global    = parameters[6].valueAsText
-        huc_ids        = parameters[7].valueAsText
-        copy_bc_layers = parameters[8].valueAsText
-        copy_xml       = parameters[9].valueAsText
-        copy_schema    = parameters[10].valueAsText
+        regionID       = parameters[0]
+        accessKeyID    = parameters[1]
+        accessKey      = parameters[2]
+        workspace      = parameters[3]
+        copy_whole     = parameters[4]
+        copy_archydro  = parameters[5]
+        copy_global    = parameters[6]
+        huc_ids        = parameters[7]
+        copy_bc_layers = parameters[8]
+        copy_xml       = parameters[9]
+        copy_schema    = parameters[10]
         
         arcpy.env.overwriteOutput = True
 
@@ -89,8 +89,8 @@ class Main(object):
 
         destinationBucket = 's3://streamstats-staged-data'
 
-        self.states = ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "CRB","DC", "DE", "DRB", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "RRB", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"]
-
+        self.states = ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "CRB","DC", "DE", "DRB", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MO_STL", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "RRB", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"]
+        
 
         try:
             if not regionID:
@@ -106,8 +106,8 @@ class Main(object):
                 arcpy.AddError('Region ID not found. Please use the region abbreviation, e.g. "AK" for Alaska')
                 sys.exit()
             elif regionID != 'all':
-				self.states = [regionID]
-            
+                self.states = [regionID]
+			
             for state in self.states:
                 state_folder = os.path.join(workspace, state)
                 dest_state = destinationBucket + '/data/' + state.lower()
@@ -145,7 +145,7 @@ class Main(object):
                     elif self.__checkS3Bucket__(destinationBucket + schema_path1) == 'True':
                         self.__copyS3__(destinationBucket + schema_path1, state_folder + schema_gdb, '--recursive')
                 ParseData(state_folder, state, workspace, xml_loc , 'true', 'true', huc_ids, 'pull')
-
+				
             self.isComplete = True
             self.__sm__('Finished \n')
 
@@ -201,7 +201,7 @@ class Main(object):
         """
         if args == None:
             args = ""
-        
+        print "source: " + source
         if self.__checkS3Bucket__(source) == 'True':
             cmd="aws s3 cp " + source + " " + destination +  " " + args
             cmd_print = 'Copying ' + source + ' to ' + destination + '...'
@@ -214,12 +214,8 @@ class Main(object):
             except subprocess.CalledProcessError as e:
                 tb = traceback.format_exc()
                 if 'lock' not in e.output and 'exit status 2' not in tb:
-                    arcpy.AddError('Make sure AWS CLI has been installed')
                     print e.output
                     arcpy.AddError(e.output)
-                    print tb
-                    arcpy.AddError(tb)
-                    sys.exit()
         else:
             print source + ' not found'
             self.__sm__(source + ' not found')
@@ -230,21 +226,16 @@ class Main(object):
         """checkS3Bucket(fileLocation=None)
             function to check for existence of files in s3 bucket
         """
-        cmd = "aws s3 ls " + fileLocation + " | wc -l"
+        cmd = "aws s3 ls " + fileLocation + " "
         try:
             output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
-            if '0' in output:
-                return 'False'
-            else:
+            if output:
                 return 'True'
+            else:
+                return 'False'
 
-        except subprocess.CalledProcessError as e:
-            print e.output
-            arcpy.AddError(e.output)
-            tb = traceback.format_exc()
-            print tb
-            arcpy.AddError(tb)
-            sys.exit()
+        except:
+            return 'False'
         else:
             self.__sm__('Received list of elements in bucket')
 
@@ -263,10 +254,10 @@ if __name__ == '__main__':
     """
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-region_id", help="specifies the regional folder to pull from S3", type=str, default='all')
+    parser.add_argument("-region_id", help="specifies the regional folder to pull from S3", type=str, default='mo')
     parser.add_argument("-accessKeyID", help="specifies the AWS Access Key ID for the person pulling the data", type=str, default='xxxxxxxxxxxxxxxxxxxx')
     parser.add_argument("-accessKey", help="specifies the AWS Secret Access Key of the person pulling the data", type=str, default='xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx')
-    parser.add_argument("-workspace", help="specifies the workspace folder where the regional data will go", type=str, default=r'C:\Users\kjacobsen\Documents\wim_projects\ss_data\test-pull\1')
+    parser.add_argument("-workspace", help="specifies the workspace folder where the regional data will go", type=str, default=r'E:\data')
     parser.add_argument("-copy_whole", help="indicates whether to copy the entire regional folder", type=str, default='true')
     parser.add_argument("-copy_whole_archydro", help="indicates whether to copy the entire archydro folder", type=str, default='false')
     parser.add_argument("-copy_global", help="indicates whether to copy the global.gdb", type=str, default='false')

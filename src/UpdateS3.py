@@ -40,7 +40,7 @@ class Main(object):
     def __init__(self, parameters):
         self.isComplete = False
         self.Message = ""
-        workspace = parameters[4].valueAsText
+        workspace = parameters[4]
 
         self.__TempLocation__ = os.path.join(workspace, "Temp")
 
@@ -62,18 +62,18 @@ class Main(object):
 
     def __run__(self, parameters):
         self.__sm__('Initialized')
-        logNote        = parameters[0].valueAsText
-        accessKeyID    = parameters[1].valueAsText
-        accessKey      = parameters[2].valueAsText
-        editorName     = parameters[3].valueAsText
-        workspace      = parameters[4].valueAsText
-        state_folder   = parameters[5].valueAsText
-        xml_file       = parameters[6].valueAsText
-        copy_bc_layers = parameters[7].valueAsText
-        copy_archydro  = parameters[8].valueAsText
-        copy_global    = parameters[9].valueAsText
-        huc_folders    = parameters[10].valueAsText
-        schema_file    = parameters[11].valueAsText
+        logNote        = parameters[0]
+        accessKeyID    = parameters[1]
+        accessKey      = parameters[2]
+        editorName     = parameters[3]
+        workspace      = parameters[4]
+        state_folder   = parameters[5]
+        xml_file       = parameters[6]
+        copy_bc_layers = parameters[7]
+        copy_archydro  = parameters[8]
+        copy_global    = parameters[9]
+        huc_folders    = parameters[10]
+        schema_file    = parameters[11]
         
         arcpy.env.overwriteOutput = True
 
@@ -164,11 +164,11 @@ class Main(object):
                         else:
                             print 'Huc folder not found: ' + huc_folder
                             arcpy.AddError('Huc folder not found: ' + huc_folder)
-                parse.__checkPixelDepth__(state_folder)
+                ##parse.__checkPixelDepth__(state_folder) ##skip this step when running from command line
 
             seperator = ','
             commands = seperator.join(commands)
-                
+			
             self.__logData__(destinationBucket, workspace,state, accessKeyID, commands, user_name, logNote)
 
             self.isComplete = True
@@ -294,9 +294,6 @@ class Main(object):
                     arcpy.AddError('Make sure AWS CLI has been installed')
                     print e.output
                     arcpy.AddError(e.output)
-                    print tb
-                    arcpy.AddError(tb)
-                    sys.exit()
 
         #create AWS CLI command
         cmd="aws s3 cp " + source + " " + destination +  " " + args
@@ -313,29 +310,21 @@ class Main(object):
                 arcpy.AddError('Make sure AWS CLI has been installed')
                 print e.output
                 arcpy.AddError(e.output)
-                print tb
-                arcpy.AddError(tb)
-                sys.exit()
 
     def __checkS3Bucket__(self, fileLocation=None):
         """checkS3Bucket(fileLocation=None)
             function to check for existence of files in s3 bucket
         """
-        cmd = "aws s3 ls " + fileLocation + " | wc -l"
+        cmd = "aws s3 ls " + fileLocation + " "
         try:
             output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
-            if '0' in output:
-                return 'False'
-            else:
+            if output:
                 return 'True'
+            else:
+                return 'False'
 
-        except subprocess.CalledProcessError as e:
-            print e.output
-            arcpy.AddError(e.output)
-            tb = traceback.format_exc()
-            print tb
-            arcpy.AddError(tb)
-            sys.exit()
+        except:
+            return 'False'
         else:
             self.__sm__('Received list of elements in bucket')
 
@@ -408,7 +397,7 @@ if __name__ == '__main__':
     parser.add_argument("-copy_archydro", help="indicates whether to copy the entire archydro folder", type=str, default='true')
     parser.add_argument("-copy_global", help="indicates whether to copy the global.gdb", type=str, default='false')
     parser.add_argument("-huc_folders", help="indicates which huc folders to upload", type=str, default='')
-    parser.add_argument("-schema_file", help="specifies the location of the regional schema .gdb", type=str, default='E:\schemas\VT_ss.gdb')
+    parser.add_argument("-schema_file", help="specifies the location of the regional schema .gdb", type=str, default=r'E:\schemas\VT_ss.gdb')
 
     args = parser.parse_args()
     parameters = []
