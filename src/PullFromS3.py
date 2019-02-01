@@ -120,6 +120,7 @@ class Main(object):
                     self.__copyS3__(dest_state + '/bc_layers', state_folder + '/bc_layers', '--recursive')
                     
                 if copy_archydro == 'true':
+                    arcpy.AddMessage('copy_archydro: ' + copy_archydro);
                     self.__copyS3__(dest_state + '/archydro', state_folder + '/archydro', '--recursive')
 
                 if copy_global == 'true':
@@ -130,10 +131,6 @@ class Main(object):
                     for huc_id in huc_ids:
                         huc_path = '/archydro/' + huc_id
                         self.__copyS3__(dest_state + huc_path, state_folder + huc_path, '--recursive')
-                if copy_whole == 'true':
-                    self.__copyS3__(dest_state + '/', state_folder, '--recursive')
-                    copy_archydro = 'true'
-                    copy_bc_layers = 'true'
                 if any([copy_xml == 'true', copy_archydro == 'true', copy_bc_layers == 'true', copy_whole == 'true', huc_ids]):
                     self.__copyS3__(dest_xml, xml_loc, '')
                 if copy_schema == 'true' or copy_whole == 'true':
@@ -144,7 +141,11 @@ class Main(object):
                         self.__copyS3__(destinationBucket + schema_path, state_folder + schema_gdb, '--recursive')
                     elif self.__checkS3Bucket__(destinationBucket + schema_path1) == 'True':
                         self.__copyS3__(destinationBucket + schema_path1, state_folder + schema_gdb, '--recursive')
-                ParseData(state_folder, state, workspace, xml_loc , copy_archydro, copy_bc_layers, huc_ids, 'pull')
+                if copy_whole == 'true':
+                    self.__copyS3__(dest_state + '/', state_folder, '--recursive')
+                    ParseData(state_folder, state, workspace, xml_loc , 'true', 'true', huc_ids, 'pull')
+                else:
+                    ParseData(state_folder, state, workspace, xml_loc , copy_archydro, copy_bc_layers, huc_ids, 'pull')
 
             self.isComplete = True
             self.__sm__('Finished \n')
