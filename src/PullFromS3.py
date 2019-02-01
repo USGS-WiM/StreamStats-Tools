@@ -89,7 +89,7 @@ class Main(object):
 
         destinationBucket = 's3://streamstats-staged-data'
 
-        self.states = ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "CRB","DC", "DE", "DRB", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "RRB", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"]
+        self.states = ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "CRB","DC", "DE", "DRB", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MO_STL", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "RRB", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"]
 
 
         try:
@@ -144,7 +144,7 @@ class Main(object):
                         self.__copyS3__(destinationBucket + schema_path, state_folder + schema_gdb, '--recursive')
                     elif self.__checkS3Bucket__(destinationBucket + schema_path1) == 'True':
                         self.__copyS3__(destinationBucket + schema_path1, state_folder + schema_gdb, '--recursive')
-                ParseData(state_folder, state, workspace, xml_loc , 'true', 'true', huc_ids, 'pull')
+                ParseData(state_folder, state, workspace, xml_loc , copy_archydro, copy_bc_layers, huc_ids, 'pull')
 
             self.isComplete = True
             self.__sm__('Finished \n')
@@ -266,7 +266,7 @@ if __name__ == '__main__':
     parser.add_argument("-region_id", help="specifies the regional folder to pull from S3", type=str, default='all')
     parser.add_argument("-accessKeyID", help="specifies the AWS Access Key ID for the person pulling the data", type=str, default='xxxxxxxxxxxxxxxxxxxx')
     parser.add_argument("-accessKey", help="specifies the AWS Secret Access Key of the person pulling the data", type=str, default='xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx')
-    parser.add_argument("-workspace", help="specifies the workspace folder where the regional data will go", type=str, default=r'C:\Users\kjacobsen\Documents\wim_projects\ss_data\test-pull\1')
+    parser.add_argument("-workspace", help="specifies the workspace folder where the regional data will go", type=str, default=r'')
     parser.add_argument("-copy_whole", help="indicates whether to copy the entire regional folder", type=str, default='true')
     parser.add_argument("-copy_whole_archydro", help="indicates whether to copy the entire archydro folder", type=str, default='false')
     parser.add_argument("-copy_global", help="indicates whether to copy the global.gdb", type=str, default='false')
