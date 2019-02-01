@@ -144,7 +144,7 @@ class Main(object):
                         self.__copyS3__(destinationBucket + schema_path, state_folder + schema_gdb, '--recursive')
                     elif self.__checkS3Bucket__(destinationBucket + schema_path1) == 'True':
                         self.__copyS3__(destinationBucket + schema_path1, state_folder + schema_gdb, '--recursive')
-                ParseData(state_folder, state, workspace, xml_loc , 'true', 'true', huc_ids, 'pull')
+                ParseData(state_folder, state, workspace, xml_loc , copy_archydro, copy_bc_layers, huc_ids, 'pull')
 				
             self.isComplete = True
             self.__sm__('Finished \n')

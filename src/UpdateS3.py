@@ -246,7 +246,7 @@ class Main(object):
             try:
                 desc = arcpy.Describe(item)
                 if desc.dataType == 'Workspace':
-                    self.__sm__('Found a valid file geodatabase: ' + filename + ', item: ' + item)
+                    arcpy.AddError('Found a valid file geodatabase: ' + filename + ', item: ' + item)
                     return 'fgdb'
             except:
                 print 'You did not select a valid file geodatabase: ' + filename

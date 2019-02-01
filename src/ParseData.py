@@ -69,11 +69,11 @@ class Main(object):
                     self.__thinXML__(xmlPath, "StreamStatsConfig" + os.path.basename(stateFolder).upper(), 0, "ProgParams") #removes unnecessary nodes from xml
                 self.__thinXML__(xmlPath, "ProgParams", 0, {"ApFunctions", "TempLocation"})
                 self.__thinXML__(xmlPath, "ApFunctions", 0, {"GlobalPointDelineation", "WshParams"})
-                self.__thinXML__(xmlPath, "ApFunction", 0, {"ApFields", "ApLayers", "DataPath", "GlobalDataPath", "SnapToleranceNumCells", "RASTERDATAPATH", "VECTORDATAPATH"})
-                self.__thinXML__(xmlPath, "ApFunction", 1, {"ApFields", "ApLayers", "DataPath", "GlobalDataPath", "SnapToleranceNumCells", "RASTERDATAPATH", "VECTORDATAPATH"})
+                self.__thinXML__(xmlPath, "ApFunction", 0, {"ApFields", "ApLayers", "DataPath", "GlobalDataPath", "SnapToleranceNumCells", "CleanupThresholdNumCells", "RASTERDATAPATH", "VECTORDATAPATH", "ParameterDelimiter"})
+                self.__thinXML__(xmlPath, "ApFunction", 1, {"ApFields", "ApLayers", "DataPath", "GlobalDataPath", "SnapToleranceNumCells", "CleanupThresholdNumCells", "RASTERDATAPATH", "VECTORDATAPATH", "ParameterDelimiter"})
 
                 if stateFolder:
-                    arcpy.AddMessage('Parsing state data')
+                    arcpy.AddMessage('Parsing state data for: ' + os.path.basename(stateFolder).upper())
                     wshLayers = self.__getXMLLayers__(xmlPath, "wsh") #get layers necessary for basin characteristics
                     delinLayers = self.__getXMLLayers__(xmlPath, "delin") #get layers necessary for delineation
                     layers = wshLayers + delinLayers
@@ -154,6 +154,8 @@ class Main(object):
         # remove unnecessary files from state folders using layer names parsed from xml
         fileDirs = []
         layers.extend(('global.gdb', 'schema', 'streamstats' + self.RegionID, self.RegionID + '_ss.gdb', 'readme', 'xml'))
+        # adjusted for NY
+        if os.path.basename(stateFolder).lower() == "ny": layers.extend(('cat', 'info'))
         seperator = ';'
         lays = seperator.join(layers)
         self.__sm__('Layers to Keep: ' + lays)
@@ -163,9 +165,10 @@ class Main(object):
                 filename = os.path.splitext(name)[0].lower()
                 filePath = os.path.join(root,name)
                 fileDir = os.path.basename(os.path.dirname(filePath)).lower()
-                if all([not filePath.endswith('.gdb'), not fileDir.endswith('.gdb'),fileDir not in layers,filename not in layers,filename[:-4] not in layers,os.path.dirname(filePath) != os.path.join(stateFolder, "bc_layers","info")]) or name.endswith('.mdb'):
+                if all([not filePath.endswith('.gdb'), not fileDir.endswith('.gdb'),name.lower() not in layers, fileDir not in layers,filename not in layers,filename[:-4] not in layers,os.path.dirname(filePath) != os.path.join(stateFolder, "bc_layers","info")]) or name.endswith('.mdb'):
                     if os.path.dirname(filePath) not in fileDirs:
                         fileDirs.append(os.path.dirname(filePath))
+                    self.__sm__('deleted file: ' + filePath)
                     os.remove(filePath)
             for d in (d for d in dirs if d.lower().endswith('.gdb')):
                 upperDir = os.path.basename(os.path.dirname(os.path.join(root, d)))
