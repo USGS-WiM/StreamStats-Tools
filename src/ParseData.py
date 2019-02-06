@@ -61,8 +61,9 @@ class Main(object):
             self.__sm__('initialized')
             if xmlPath:
                 arcpy.AddMessage('Parsing xml')
-                shutil.copy(xmlPath, tempLoc)
-                xmlPath = os.path.join(tempLoc, os.path.basename(xmlPath))
+                if direction == 'upload'
+                    shutil.copy(xmlPath, tempLoc)
+                    xmlPath = os.path.join(tempLoc, os.path.basename(xmlPath))
                 try:
                     self.__thinXML__(xmlPath, "StreamStatsConfig", 0, "ProgParams") #removes unnecessary nodes from xml
                 except:
@@ -153,7 +154,7 @@ class Main(object):
     def __deleteFiles__(self, stateFolder, layers):
         # remove unnecessary files from state folders using layer names parsed from xml
         fileDirs = []
-        layers.extend(('global.gdb', 'schema', 'streamstats' + self.RegionID, self.RegionID + '_ss.gdb', 'readme', 'xml'))
+        layers.extend(('global.gdb', 'schema', 'streamstats' + self.RegionID.lower(), self.RegionID.lower() + '_ss.gdb', 'readme', 'xml'))
         # adjusted for NY
         if os.path.basename(stateFolder).lower() == "ny": layers.extend(('cat', 'info'))
         seperator = ';'
