@@ -58,6 +58,7 @@ class Main(object):
     #Private Methods
     def __run__(self, xmlPath, stateFolder, tempLoc, copy_archydro, copy_bc_layers, huc_folders, direction):
         try:
+            state = os.path.basename(stateFolder).upper()
             self.__sm__('initialized')
             if xmlPath:
                 arcpy.AddMessage('Parsing xml')
@@ -65,20 +66,22 @@ class Main(object):
                     shutil.copy(xmlPath, tempLoc)
                     xmlPath = os.path.join(tempLoc, os.path.basename(xmlPath))
                 try:
-                    self.__thinXML__(xmlPath, "StreamStatsConfig", 0, "ProgParams") #removes unnecessary nodes from xml
+                    if state == 'HI':
+                        self.__thinXML__(xmlPath, "StreamStatsConfig", 0,  {"ProgParams","TemplateView"}) #removes unnecessary nodes from xml
+                    else:
+                        self.__thinXML__(xmlPath, "StreamStatsConfig", 0, "ProgParams")
                 except:
-                    self.__thinXML__(xmlPath, "StreamStatsConfig" + os.path.basename(stateFolder).upper(), 0, "ProgParams") #removes unnecessary nodes from xml
+                    self.__thinXML__(xmlPath, "StreamStatsConfig" + state, 0, "ProgParams")
                 self.__thinXML__(xmlPath, "ProgParams", 0, {"ApFunctions", "TempLocation"})
                 self.__thinXML__(xmlPath, "ApFunctions", 0, {"GlobalPointDelineation", "WshParams"})
-                self.__thinXML__(xmlPath, "ApFunction", 0, {"ApFields", "ApLayers", "DataPath", "GlobalDataPath", "SnapToleranceNumCells", "CleanupThresholdNumCells", "RASTERDATAPATH", "VECTORDATAPATH", "ParameterDelimiter"})
-                self.__thinXML__(xmlPath, "ApFunction", 1, {"ApFields", "ApLayers", "DataPath", "GlobalDataPath", "SnapToleranceNumCells", "CleanupThresholdNumCells", "RASTERDATAPATH", "VECTORDATAPATH", "ParameterDelimiter"})
+                self.__thinXML__(xmlPath, "ApFunction", 0, {"ApFields", "ApLayers", "DataPath", "GlobalDataPath", "SnapToleranceNumCells", "CleanupThresholdNumCells", "RASTERDATAPATH", "VECTORDATAPATH", "ParameterDelimiter", "ParamsDisplayOrder", "NetworkName", "RelationshipName", "FromProjectionFileName"})
+                self.__thinXML__(xmlPath, "ApFunction", 1, {"ApFields", "ApLayers", "DataPath", "GlobalDataPath", "SnapToleranceNumCells", "CleanupThresholdNumCells", "RASTERDATAPATH", "VECTORDATAPATH", "ParameterDelimiter", "ParamsDisplayOrder", "NetworkName", "RelationshipName", "FromProjectionFileName"})
 
                 if stateFolder:
-                    arcpy.AddMessage('Parsing state data for: ' + os.path.basename(stateFolder).upper())
+                    arcpy.AddMessage('Parsing state data for: ' + state)
                     wshLayers = self.__getXMLLayers__(xmlPath, "wsh") #get layers necessary for basin characteristics
                     delinLayers = self.__getXMLLayers__(xmlPath, "delin") #get layers necessary for delineation
                     layers = wshLayers + delinLayers
-
                     if direction == 'upload':
                         stateFolder = self.__copydata__(stateFolder, tempLoc, copy_archydro, copy_bc_layers, huc_folders)
 
