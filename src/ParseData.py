@@ -51,8 +51,7 @@ class Main(object):
         self.__logger__.addHandler(handler)
         handler.setFormatter(formatter)
         
-        if regionID.upper() != "MO_STL":
-            self.__run__(xml, stateFolder, self.__TempLocation__, copy_archydro, copy_bc_layers, huc_folders, direction)  
+        self.__run__(xml, stateFolder, self.__TempLocation__, copy_archydro, copy_bc_layers, huc_folders, direction)  
             
     #endregion  
          
@@ -61,7 +60,7 @@ class Main(object):
         try:
             state = os.path.basename(stateFolder).upper()
             self.__sm__('initialized')
-            if xmlPath:
+            if xmlPath and state.upper() != "MO_STL":
                 arcpy.AddMessage('Parsing xml')
                 if direction == 'upload':
                     shutil.copy(xmlPath, tempLoc)

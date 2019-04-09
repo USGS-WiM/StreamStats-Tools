@@ -315,6 +315,8 @@ class Main(object):
                 arcpy.AddError(e.output)
                 print tb
                 arcpy.AddError(tb)
+                self.__sm__(e.output)
+                self.__sm__(tb)
                 sys.exit()
 
     def __checkS3Bucket__(self, fileLocation=None):
@@ -335,6 +337,8 @@ class Main(object):
             tb = traceback.format_exc()
             print tb
             arcpy.AddError(tb)
+            self.__sm__(e.output)
+            self.__sm__(tb)
             sys.exit()
         else:
             self.__sm__('Received list of elements in bucket')

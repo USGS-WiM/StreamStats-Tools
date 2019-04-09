@@ -142,8 +142,6 @@ class updateS3Bucket(object):
 
     def execute(self, parameters, messages):
 
-        messages.addMessage('Running script to update S3')
-
         updates3 = UpdateS3(parameters) 
 
 class basinDelin(object):
@@ -269,7 +267,6 @@ class basinDelin(object):
             """validateSchema(item=None)
                 Determines if input schema is either a valid .prj file or a valid file geodatabse
             """
-            messages.addMessage('validating schema')
             filename = item.replace('\\','/').split('/')[-1]
 
             #validate prj file
@@ -284,12 +281,13 @@ class basinDelin(object):
 
             #validate file gdb
             elif os.path.isdir(item) and filename.find('gdb'):
-                messages.addMessage('inside gdb test')
                 try:
                     desc = arcpy.Describe(item)
                     if desc.dataType == 'Workspace':
                         messages.addMessage('Found a valid file geodatabase: ' + filename + ', item: ' + item )
                         return item
+                    else:
+                        messages.addErrorMessage('You did not select a valid file geodatabase: ' + filename)
                 except:
                     messages.addErrorMessage('You did not select a valid file geodatabase: ' + filename)
 
@@ -440,7 +438,7 @@ class basinParams(object):
 
 class pullS3(object):
     def __init__(self):
-        self.label       = "Pull regional data from S3"
+        self.label       = "Pull Regional Data From S3"
         self.description = ""
 
     def getParameterInfo(self):
@@ -558,8 +556,6 @@ class pullS3(object):
         return
 
     def execute(self, parameters, messages):
-
-        messages.addMessage('Running script to pull from S3')
         try:
             PullFromS3(parameters)
         except:
