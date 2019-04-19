@@ -16,7 +16,7 @@
         ]
       },
   
-      "homepageURL": "https://wim.usgs.gov",
+      "homepageURL": "https://streamstats.usgs.gov",
       "downloadURL": "https://github.com/USGS-WiM/StreamStats-Tools/archive/master.zip",
       "disclaimerURL": "https://github.com/USGS-WiM/StreamStats-Tools/blob/master/DISCLAIMER.md",
       "repositoryUrl": "https://github.com/USGS-WiM/StreamStats-Tools",
@@ -26,8 +26,9 @@
   
       "tags": [
         "streamstats",
+        "scripts",
+        "guidance",
         "tools",
-        "python",
         "toolbox"
       ],
   
@@ -41,7 +42,7 @@
       },
   
       "date": {
-        "metadataLastUpdated": "2018-04-19"
+        "metadataLastUpdated": "2019-04-19"
       }
     }
   ]
