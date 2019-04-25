@@ -42,7 +42,7 @@ class Main(object):
         self.Message = ""
         workspace = parameters[3].valueAsText
 
-        self.__TempLocation__ = os.path.join(workspace, "Temp")
+        self.__TempLocation__ = os.path.join(workspace, "Temp" + time.strftime('%Y%m%d%H%M%S'))
 
         if not os.path.exists(self.__TempLocation__): 
             os.makedirs(self.__TempLocation__)
@@ -56,11 +56,11 @@ class Main(object):
         self.__logger__.addHandler(handler)
         handler.setFormatter(formatter)
         
-        self.__run__(parameters)  
+        self.__run__(parameters, self.__TempLocation__)  
             
     #endregion  
 
-    def __run__(self, parameters):
+    def __run__(self, parameters, tempLocation):
         self.__sm__('Initialized') 
         regionID       = parameters[0].valueAsText
         accessKeyID    = parameters[1].valueAsText
@@ -73,6 +73,7 @@ class Main(object):
         copy_bc_layers = parameters[8].valueAsText
         copy_xml       = parameters[9].valueAsText
         copy_schema    = parameters[10].valueAsText
+        copy_global    = parameters[11].valueAsText
         
         arcpy.env.overwriteOutput = True
 
@@ -83,7 +84,7 @@ class Main(object):
             self.__configureAWSKey__(accessKey)
             
         except ImportError:
-            print "Error using aws credentials"
+            self.__sm__('Error using aws credentials', 'ERROR')
             arcpy.AddError('Error using aws credentials')
             sys.exit()
 
@@ -94,15 +95,15 @@ class Main(object):
 
         try:
             if not regionID:
-                print 'ERROR: A state folder is required for one or more functions.'
+                self.__sm__('ERROR: A state folder is required for one or more functions.', 'ERROR')
                 arcpy.AddError('A state folder is required for one or more functions.')
                 sys.exit()
             if all([copy_whole == 'false', copy_archydro == 'false', copy_global == 'false', huc_ids == '',  copy_bc_layers == 'false', copy_xml == 'false', copy_schema == 'false']):
-                print 'ERROR: Please choose at least one thing to copy'
+                self.__sm__('ERROR: Please choose at least one thing to copy', 'ERROR')
                 arcpy.AddError('Please choose at least one thing to copy')
                 sys.exit()
             if regionID.upper() not in self.states and regionID != 'all':
-                print 'ERROR: Region ID not found. Please use the region abbreviation, e.g. "AK" for Alaska'
+                self.__sm__('ERROR: Region ID not found. Please use the region abbreviation, e.g. "AK" for Alaska', 'ERROR')
                 arcpy.AddError('Region ID not found. Please use the region abbreviation, e.g. "AK" for Alaska')
                 sys.exit()
             elif regionID != 'all':
@@ -142,9 +143,9 @@ class Main(object):
                         self.__copyS3__(dest_state + schema_path1, state_folder + schema_path1, '--recursive')
                 if copy_whole == 'true':
                     self.__copyS3__(dest_state + '/', state_folder, '--recursive')
-                    ParseData(state_folder, state, workspace, xml_loc , 'true', 'true', huc_ids, 'pull')
+                    ParseData(state_folder, state, tempLocation, xml_loc , 'true', 'true', huc_ids, copy_global, 'pull')
                 else:
-                    ParseData(state_folder, state, workspace, xml_loc , copy_archydro, copy_bc_layers, huc_ids, 'pull')
+                    ParseData(state_folder, state, tempLocation, xml_loc , copy_archydro, copy_bc_layers, huc_ids, copy_global, 'pull')
 
             self.isComplete = True
             self.__sm__('Finished \n')
@@ -153,7 +154,7 @@ class Main(object):
             tb = traceback.format_exc() 
             self.__sm__("Error uploading data to S3 "+tb,"ERROR")
             print tb
-            arcpy.AddError(tb)
+            arcpy.AddError("Error uploading data to S3 "+tb)
             self.isComplete = False
 
     def __configureAWSKeyID__(self, AWSKeyID):
@@ -167,10 +168,10 @@ class Main(object):
                     output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
                 except subprocess.CalledProcessError as e:
                     #messages.addErrorMessage('Configure not successful.  Please make sure you have inserted the correct credentials.')
-                    print e.output
+                    self.__sm__(e.output, 'ERROR')
                     arcpy.AddError(e.output)
                     tb = traceback.format_exc()
-                    print tb
+                    self.__sm__(b, 'ERROR')
                     arcpy.AddError(tb)
                     sys.exit()
                 else:
@@ -186,10 +187,10 @@ class Main(object):
             output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
             #messages.addErrorMessage('Configure not successful.  Please make sure you have entered the correct credentials.')
-            print e.output
+            self.__sm__(e.output, 'ERROR')
             arcpy.AddError(e.output)
             tb = traceback.format_exc()
-            print tb
+            self.__sm__(tb, 'ERROR')
             arcpy.AddError(tb)
             sys.exit()
         else:
@@ -215,12 +216,11 @@ class Main(object):
                 tb = traceback.format_exc()
                 if 'lock' not in e.output and 'exit status 2' not in tb:
                     arcpy.AddError('Make sure AWS CLI has been installed')
-                    print e.output
+                    self.__sm__('Make sure AWS CLI has been installed', 'ERROR')
+                    self.__sm__(e.output, 'ERROR')
                     arcpy.AddError(e.output)
-                    print tb
+                    self.__sm__(tb, 'ERROR')
                     arcpy.AddError(tb)
-                    self.__sm__(e.output)
-                    self.__sm__(tb)
         else:
             print source + ' not found'
             self.__sm__(source + ' not found')
@@ -240,10 +240,10 @@ class Main(object):
                 return 'True'
 
         except subprocess.CalledProcessError as e:
-            print e.output
+            self.__sm__(e.output, 'ERROR')
             arcpy.AddError(e.output)
             tb = traceback.format_exc()
-            print tb
+            self.__sm__(tb, 'ERROR')
             arcpy.AddError(tb)
             sys.exit()
         else:

@@ -42,7 +42,7 @@ class Main(object):
         self.Message = ""
         workspace = parameters[4].valueAsText
 
-        self.__TempLocation__ = os.path.join(workspace, "Temp")
+        self.__TempLocation__ = os.path.join(workspace, "Temp" + time.strftime('%Y%m%d%H%M%S'))
 
         if not os.path.exists(self.__TempLocation__): 
             os.makedirs(self.__TempLocation__)
@@ -56,11 +56,11 @@ class Main(object):
         self.__logger__.addHandler(handler)
         handler.setFormatter(formatter)
         
-        self.__run__(parameters)  
+        self.__run__(parameters, self.__TempLocation__)  
             
     #endregion  
 
-    def __run__(self, parameters):
+    def __run__(self, parameters, tempLocation):
         self.__sm__('Initialized')
         logNote        = parameters[0].valueAsText
         accessKeyID    = parameters[1].valueAsText
@@ -85,7 +85,7 @@ class Main(object):
             user_name = editorName
 
         except ImportError:
-            print "Error using aws credentials"
+            self.__sm__("Error using aws credentials", 'ERROR')
             arcpy.AddError('Error using aws credentials')
             sys.exit()
 
@@ -97,11 +97,11 @@ class Main(object):
         commands = []
         try:
             if (copy_archydro == 'true' or copy_bc_layers == 'true' or copy_global == 'true' or huc_folders) and not state_folder:
-                print 'ERROR: A state folder is required for one or more functions.'
+                self.__sm__('ERROR: A state folder is required for one or more functions.', 'ERROR')
                 arcpy.AddError('A state folder is required for one or more functions.')
                 sys.exit()
             if state_folder and not xml_file:
-                print 'ERROR: An .xml file is required for parsing the data before upload.'
+                self.__sm__('ERROR: An .xml file is required for parsing the data before upload.', 'ERROR')
                 arcpy.AddError('An .xml file is required for parsing the data before upload.')
                 sys.exit()
             #check for xml file input
@@ -109,14 +109,15 @@ class Main(object):
                 self.__sm__('Now processing xml: ' + xml_file)
                 filename = xml_file.replace('\\','/').split('/')[-1]
                 state = filename.split('.xml')[0].split('StreamStats')[1].upper()
-                parse = ParseData(state_folder, state, workspace, xml_file, copy_archydro, copy_bc_layers, huc_folders, 'upload')
+                parse = ParseData(state_folder, state, tempLocation, xml_file, copy_archydro, copy_bc_layers, huc_folders, copy_global, 'upload')
                 parse_file = parse.__xmlPath__
-                if arcpy.Exists(parse_file) and self.__validateStreamStatsXML__(xml_file):
+                checkXML = self.__validateStreamStatsXML__(xml_file)
+                if arcpy.Exists(parse_file) and checkXML:
                     commands.append('xml')
                     self.__copyS3__(parse_file, destinationBucket + '/' + state.lower() + '/' + filename, '')
                 else:
-                    print "There is no valid .xml file.  File should be named 'Streamstats" + state + ".xml'."
-                    arcpy.AddWarning("There is no valid .xml file.  File should be named 'Streamstats" + state + ".xml'.")
+                    self.__sm__("There is no valid .xml file.  File should be named 'Streamstats" + state + ".xml'.", 'ERROR')
+                    arcpy.AddError("There is no valid .xml file.  File should be named 'Streamstats" + state + ".xml'.")
                     sys.exit()
 
             if schema_file:
@@ -134,7 +135,7 @@ class Main(object):
                 self.__sm__('Processing: ' + state)
                 arcpy.AddMessage('Processing: ' + state)
                 if not parse_file:
-                    parse = ParseData(state_folder, state, workspace, xml_file, copy_archydro, copy_bc_layers, huc_folders, 'upload')
+                    parse = ParseData(state_folder, state, tempLocation, xml_file, copy_archydro, copy_bc_layers, huc_folders, copy_global, 'upload')
                 state_folder = parse.__stateFolder__
                 self.__sm__("new state folder: " + state_folder)
                     
@@ -162,7 +163,7 @@ class Main(object):
                             commands.append('huc ' + huc_id)
                             self.__copyS3__(huc_folder, destinationBucket + '/' + state.lower() + '/archydro/' + huc_id, '--recursive')
                         else:
-                            print 'Huc folder not found: ' + huc_folder
+                            self.__sm__('Huc folder not found: ' + huc_folder)
                             arcpy.AddError('Huc folder not found: ' + huc_folder)
                 parse.__checkPixelDepth__(state_folder)
 
@@ -176,9 +177,10 @@ class Main(object):
 
         except:
             tb = traceback.format_exc() 
-            self.__sm__("Error uploading data to S3 "+tb,"ERROR")
-            print tb
-            arcpy.AddError(tb)
+            if 'SystemExit' not in tb:
+                self.__sm__("Error uploading data to S3 "+tb,"ERROR")
+                print tb
+                arcpy.AddError(tb)
             self.isComplete = False
 
     def __configureAWSKeyID__(self, AWSKeyID):
@@ -192,10 +194,10 @@ class Main(object):
                     output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
                 except subprocess.CalledProcessError as e:
                     #messages.addErrorMessage('Configure not successful.  Please make sure you have inserted the correct credentials.')
-                    print e.output
+                    self.__sm__(e.output, 'ERROR')
                     arcpy.AddError(e.output)
                     tb = traceback.format_exc()
-                    print tb
+                    self.__sm__(tb, 'ERROR')
                     arcpy.AddError(tb)
                     sys.exit()
                 else:
@@ -211,10 +213,10 @@ class Main(object):
             output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
             #messages.addErrorMessage('Configure not successful.  Please make sure you have entered the correct credentials.')
-            print e.output
+            self.__sm__(e.output, 'ERROR')
             arcpy.AddError(e.output)
             tb = traceback.format_exc()
-            print tb
+            self.__sm__(tb, 'ERROR')
             arcpy.AddError(tb)
             sys.exit()
         else:
@@ -230,7 +232,7 @@ class Main(object):
         if fnmatch.fnmatch(filename, 'StreamStats*.xml') and stateabbr in self.states:
             return True
         else:
-            print 'You did not select a valid xml file: ' + filename
+            self.__sm__('You did not select a valid xml file: ' + filename, 'ERROR')
             arcpy.AddError('You did not select a valid xml file: ' + filename)
             sys.exit()
             
@@ -249,12 +251,12 @@ class Main(object):
                     self.__sm__('Found a valid file geodatabase: ' + filename + ', item: ' + item)
                     return 'fgdb'
             except:
-                print 'You did not select a valid file geodatabase: ' + filename
+                self.__sm__('You did not select a valid file geodatabase: ' + filename, 'ERROR')
                 arcpy.AddError('You did not select a valid file geodatabase: ' + filename)
                 sys.exit()
 
         else:
-            print 'You did not select a valid schema: ' + item
+            self.__sm__('You did not select a valid schema: ' + item, 'ERROR')
             arcpy.AddError('You did not select a valid schema: ' + item)
             sys.exit()
 
@@ -266,14 +268,14 @@ class Main(object):
 
         #validate state
         if state.upper() not in self.states:
-            print 'You did not select a valid state folder: ' + folder
+            self.__sm__('You did not select a valid state folder: ' + folder, 'ERROR')
             arcpy.AddError('You did not select a valid state folder: ' + folder)
             sys.exit()
         if os.path.isdir(folder + '/' + subfolder):
             return True
         else:
-            print 'Subfolder does not exist: ' + subfolder
-            arcpy.AddWarning('Subfolder does not exist: ' + subfolder)
+            self.__sm__('Subfolder does not exist: ' + subfolder, 'ERROR')
+            arcpy.AddError('Subfolder does not exist: ' + subfolder)
 
     def __copyS3__(self, source=None,destination=None,args=None, log=False):
         """copyS3(source=None,destination=None,args=None)
@@ -292,9 +294,9 @@ class Main(object):
                 tb = traceback.format_exc()
                 if 'lock' not in e.output and 'exit status 2' not in tb:
                     arcpy.AddError('Make sure AWS CLI has been installed')
-                    print e.output
+                    self.__sm__(e.output, 'ERROR')
                     arcpy.AddError(e.output)
-                    print tb
+                    self.__sm__(tb, 'ERROR')
                     arcpy.AddError(tb)
                     sys.exit()
 
