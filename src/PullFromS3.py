@@ -73,7 +73,6 @@ class Main(object):
         copy_bc_layers = parameters[8].valueAsText
         copy_xml       = parameters[9].valueAsText
         copy_schema    = parameters[10].valueAsText
-        copy_global    = parameters[11].valueAsText
         
         arcpy.env.overwriteOutput = True
 

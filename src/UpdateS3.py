@@ -165,7 +165,7 @@ class Main(object):
                         else:
                             self.__sm__('Huc folder not found: ' + huc_folder)
                             arcpy.AddError('Huc folder not found: ' + huc_folder)
-                parse.__checkPixelDepth__(state_folder)
+                #parse.__checkPixelDepth__(state_folder)
 
             seperator = ','
             commands = seperator.join(commands)

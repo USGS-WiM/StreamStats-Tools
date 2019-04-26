@@ -339,8 +339,8 @@ class basinDelin(object):
                             params.append(parameter['code'])
                         messages.addMessage("Parameters: " + (',').join(params))
                 except:
+                    tb = traceback.format_exc()
                     if "SystemExit" not in tb:
-                        tb = traceback.format_exc()
                         messages.addErrorMessage(tb)
 
         else:
@@ -562,6 +562,6 @@ class pullS3(object):
         try:
             PullFromS3(parameters)
         except:
+            tb = traceback.format_exc()
             if "SystemExit" not in tb:
-                tb = traceback.format_exc()
                 messages.addErrorMessage(tb)
