@@ -42,7 +42,7 @@ class Main(object):
         self.Message = ""
         workspace = parameters[4]
 
-        self.__TempLocation__ = os.path.join(workspace, "Temp")
+        self.__TempLocation__ = os.path.join(workspace, "Temp" + time.strftime('%Y%m%d%H%M%S'))
 
         if not os.path.exists(self.__TempLocation__): 
             os.makedirs(self.__TempLocation__)
@@ -56,11 +56,11 @@ class Main(object):
         self.__logger__.addHandler(handler)
         handler.setFormatter(formatter)
         
-        self.__run__(parameters)  
+        self.__run__(parameters, self.__TempLocation__) 
             
     #endregion  
 
-    def __run__(self, parameters):
+    def __run__(self, parameters, tempLocation):
         self.__sm__('Initialized')
         logNote        = parameters[0]
         accessKeyID    = parameters[1]
@@ -86,7 +86,7 @@ class Main(object):
 
         except ImportError:
             print "Error using aws credentials"
-            arcpy.AddError('Error using aws credentials')
+            self.__sm__('Error using aws credentials', 'ERROR')
             sys.exit()
 
         destinationBucket = 's3://streamstats-staged-data/test-data'
@@ -98,25 +98,26 @@ class Main(object):
         try:
             if (copy_archydro == 'true' or copy_bc_layers == 'true' or copy_global == 'true' or huc_folders) and not state_folder:
                 print 'ERROR: A state folder is required for one or more functions.'
-                arcpy.AddError('A state folder is required for one or more functions.')
+                self.__sm__('A state folder is required for one or more functions.', 'ERROR')
                 sys.exit()
             if state_folder and not xml_file:
                 print 'ERROR: An .xml file is required for parsing the data before upload.'
-                arcpy.AddError('An .xml file is required for parsing the data before upload.')
+                self.__sm__('An .xml file is required for parsing the data before upload.', 'ERROR')
                 sys.exit()
             #check for xml file input
             if xml_file:
                 self.__sm__('Now processing xml: ' + xml_file)
                 filename = xml_file.replace('\\','/').split('/')[-1]
                 state = filename.split('.xml')[0].split('StreamStats')[1].upper()
-                parse = ParseData(state_folder, state, workspace, xml_file, copy_archydro, copy_bc_layers, huc_folders, 'upload')
+                parse = ParseData(state_folder, state, tempLocation, xml_file, copy_archydro, copy_bc_layers, huc_folders, copy_global, 'upload')
                 parse_file = parse.__xmlPath__
-                if arcpy.Exists(parse_file) and self.__validateStreamStatsXML__(xml_file):
+                checkXML = self.__validateStreamStatsXML__(xml_file)
+                if arcpy.Exists(parse_file) and checkXML:
                     commands.append('xml')
                     self.__copyS3__(parse_file, destinationBucket + '/' + state.lower() + '/' + filename, '')
                 else:
                     print "There is no valid .xml file.  File should be named 'Streamstats" + state + ".xml'."
-                    arcpy.AddWarning("There is no valid .xml file.  File should be named 'Streamstats" + state + ".xml'.")
+                    self.__sm__("There is no valid .xml file.  File should be named 'Streamstats" + state + ".xml'.", 'ERROR')
                     sys.exit()
 
             if schema_file:
@@ -163,7 +164,7 @@ class Main(object):
                             self.__copyS3__(huc_folder, destinationBucket + '/' + state.lower() + '/archydro/' + huc_id, '--recursive')
                         else:
                             print 'Huc folder not found: ' + huc_folder
-                            arcpy.AddError('Huc folder not found: ' + huc_folder)
+                            self.__sm__('Huc folder not found: ' + huc_folder, 'ERROR')
                 ##parse.__checkPixelDepth__(state_folder) ##skip this step when running from command line
 
             seperator = ','
@@ -176,9 +177,10 @@ class Main(object):
 
         except:
             tb = traceback.format_exc() 
-            self.__sm__("Error uploading data to S3 "+tb,"ERROR")
-            print tb
-            arcpy.AddError(tb)
+            if 'SystemExit' not in tb:
+                self.__sm__("Error uploading data to S3 "+tb,"ERROR")
+                print tb
+                arcpy.AddError(tb)
             self.isComplete = False
 
     def __configureAWSKeyID__(self, AWSKeyID):
@@ -193,10 +195,10 @@ class Main(object):
                 except subprocess.CalledProcessError as e:
                     #messages.addErrorMessage('Configure not successful.  Please make sure you have inserted the correct credentials.')
                     print e.output
-                    arcpy.AddError(e.output)
+                    self.__sm__(e.output, 'ERROR')
                     tb = traceback.format_exc()
                     print tb
-                    arcpy.AddError(tb)
+                    self.__sm__(tb, 'ERROR')
                     sys.exit()
                 else:
                     self.__sm__('Finished configuring AWS Key ID') 
@@ -212,10 +214,10 @@ class Main(object):
         except subprocess.CalledProcessError as e:
             #messages.addErrorMessage('Configure not successful.  Please make sure you have entered the correct credentials.')
             print e.output
-            arcpy.AddError(e.output)
+            self.__sm__(e.output, 'ERROR')
             tb = traceback.format_exc()
             print tb
-            arcpy.AddError(tb)
+            self.__sm__(tb, 'ERROR')
             sys.exit()
         else:
             self.__sm__('Finished configuring AWS Secret Access Key')
@@ -246,16 +248,16 @@ class Main(object):
             try:
                 desc = arcpy.Describe(item)
                 if desc.dataType == 'Workspace':
-                    arcpy.AddError('Found a valid file geodatabase: ' + filename + ', item: ' + item)
+                    self.__sm__('Found a valid file geodatabase: ' + filename + ', item: ' + item, 'INFO')
                     return 'fgdb'
             except:
                 print 'You did not select a valid file geodatabase: ' + filename
-                arcpy.AddError('You did not select a valid file geodatabase: ' + filename)
+                self.__sm__('You did not select a valid file geodatabase: ' + filename, 'ERROR')
                 sys.exit()
 
         else:
             print 'You did not select a valid schema: ' + item
-            arcpy.AddError('You did not select a valid schema: ' + item)
+            self.__sm__('You did not select a valid schema: ' + item, 'ERROR')
             sys.exit()
 
     def __validateStreamStatsDataFolder__(self, folder=None,subfolder=None):
@@ -267,13 +269,13 @@ class Main(object):
         #validate state
         if state.upper() not in self.states:
             print 'You did not select a valid state folder: ' + folder
-            arcpy.AddError('You did not select a valid state folder: ' + folder)
+            self.__sm__('You did not select a valid state folder: ' + folder, 'ERROR')
             sys.exit()
         if os.path.isdir(folder + '/' + subfolder):
             return True
         else:
             print 'Subfolder does not exist: ' + subfolder
-            arcpy.AddWarning('Subfolder does not exist: ' + subfolder)
+            self.__sm__('Subfolder does not exist: ' + subfolder, 'ERROR')
 
     def __copyS3__(self, source=None,destination=None,args=None, log=False):
         """copyS3(source=None,destination=None,args=None)
@@ -291,9 +293,10 @@ class Main(object):
             except subprocess.CalledProcessError as e:
                 tb = traceback.format_exc()
                 if 'lock' not in e.output and 'exit status 2' not in tb:
-                    arcpy.AddError('Make sure AWS CLI has been installed')
+                    self.__sm__('Make sure AWS CLI has been installed', 'ERROR')
+                    print 'Make sure AWS CLI has been installed'
                     print e.output
-                    arcpy.AddError(e.output)
+                    self.__sm__(e.output, 'ERROR')
 
         #create AWS CLI command
         cmd="aws s3 cp " + source + " " + destination +  " " + args

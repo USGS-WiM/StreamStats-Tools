@@ -33,11 +33,11 @@ import shutil
 
 class Main(object):
     #region Constructor
-    def __init__(self, stateFolder, regionID, workspaceID, xml, copy_archydro, copy_bc_layers, huc_folders, direction): 
+    def __init__(self, stateFolder, regionID, workspaceID, xml, copy_archydro, copy_bc_layers, huc_folders, copy_global, direction): 
         self.RegionID = regionID
         self.isComplete = False
         self.Message =""
-        self.__TempLocation__ = os.path.join(workspaceID, "Temp")
+        self.__TempLocation__ = workspaceID
 
         if not os.path.exists(self.__TempLocation__): 
             os.makedirs(self.__TempLocation__)
@@ -51,7 +51,7 @@ class Main(object):
         self.__logger__.addHandler(handler)
         handler.setFormatter(formatter)
         if regionID.upper() != "MO_STL":
-            self.__run__(xml, stateFolder, self.__TempLocation__, copy_archydro, copy_bc_layers, huc_folders, direction)  
+            self.__run__(xml, stateFolder, self.__TempLocation__, copy_archydro, copy_bc_layers, huc_folders, copy_global, direction)  
             
     #endregion  
          
@@ -74,8 +74,8 @@ class Main(object):
                     self.__thinXML__(xmlPath, "StreamStatsConfig" + state, 0, "ProgParams")
                 self.__thinXML__(xmlPath, "ProgParams", 0, {"ApFunctions", "TempLocation"})
                 self.__thinXML__(xmlPath, "ApFunctions", 0, {"GlobalPointDelineation", "WshParams"})
-                self.__thinXML__(xmlPath, "ApFunction", 0, {"ApFields", "ApLayers", "DataPath", "GlobalDataPath", "SnapToleranceNumCells", "CleanupThresholdNumCells", "RASTERDATAPATH", "VECTORDATAPATH", "ParameterDelimiter", "ParamsDisplayOrder", "NetworkName", "RelationshipName", "FromProjectionFileName"})
-                self.__thinXML__(xmlPath, "ApFunction", 1, {"ApFields", "ApLayers", "DataPath", "GlobalDataPath", "SnapToleranceNumCells", "CleanupThresholdNumCells", "RASTERDATAPATH", "VECTORDATAPATH", "ParameterDelimiter", "ParamsDisplayOrder", "NetworkName", "RelationshipName", "FromProjectionFileName"})
+                self.__thinXML__(xmlPath, "ApFunction", 0, {"ApFields", "ApLayers", "DataPath", "GlobalDataPath", "SnapToleranceNumCells", "CleanupThresholdNumCells", "RASTERDATAPATH", "VECTORDATAPATH", "ParameterDelimiter", "NetworkName", "RelationshipName", "FromProjectionFileName"})
+                self.__thinXML__(xmlPath, "ApFunction", 1, {"ApFields", "ApLayers", "DataPath", "GlobalDataPath", "SnapToleranceNumCells", "CleanupThresholdNumCells", "RASTERDATAPATH", "VECTORDATAPATH", "ParameterDelimiter", "NetworkName", "RelationshipName", "FromProjectionFileName"})
 
                 if stateFolder:
                     arcpy.AddMessage('Parsing state data for: ' + state)
@@ -83,9 +83,9 @@ class Main(object):
                     delinLayers = self.__getXMLLayers__(xmlPath, "delin") #get layers necessary for delineation
                     layers = wshLayers + delinLayers
                     if direction == 'upload':
-                        stateFolder = self.__copydata__(stateFolder, tempLoc, copy_archydro, copy_bc_layers, huc_folders)
+                        stateFolder = self.__copydata__(stateFolder, tempLoc, copy_archydro, copy_bc_layers, huc_folders, copy_global)
 
-                    if copy_archydro == 'true' or copy_bc_layers == 'true' or huc_folders != '':
+                    if copy_archydro == 'true' or copy_bc_layers == 'true' or huc_folders != '' or copy_global == 'true':
                         self.__deleteFiles__(stateFolder, layers) #uses layers taken from xml to delete unnecessary files
                     arcpy.ResetEnvironments()
                     arcpy.ClearEnvironment("workspace")
@@ -106,7 +106,7 @@ class Main(object):
             del stateFolder
             self.__xmlPath__ = xmlPath
 
-    def __copydata__(self, stateFolder, tempFolder, copy_archydro, copy_bc_layers, huc_folders):
+    def __copydata__(self, stateFolder, tempFolder, copy_archydro, copy_bc_layers, huc_folders, copy_global):
         # copy state data to temp workspace before cleaning up data
         self.__sm__('Copying data folders')
         state = os.path.basename(stateFolder)
@@ -124,6 +124,10 @@ class Main(object):
                 loc = 'archydro/' + os.path.basename(huc)
                 newFolder = os.path.join(newStFolder, loc)
                 shutil.copytree(os.path.join(stateFolder, loc), newFolder)
+        if copy_global == 'true':
+            loc = 'archydro/global.gdb'
+            newFolder = os.path.join(newStFolder, loc)
+            shutil.copytree(os.path.join(stateFolder, loc), newFolder)
 
         return newStFolder
 
@@ -131,8 +135,12 @@ class Main(object):
         # remove unnecessary nodes from XML
         xmlDoc = xml.dom.minidom.parse(xmlfile)
         toRemove = []
-        for child in (child for child in xmlDoc.getElementsByTagName(firstNode)[i].childNodes if child.nodeType == 1):
-            if child.nodeName not in attr and (not child.getAttribute('Name') or child.getAttribute('Name') not in attr):
+        for child in xmlDoc.childNodes:
+            if child.nodeType == 8:
+                p = child.parentNode
+                p.removeChild(child)
+        for child in (child for child in xmlDoc.getElementsByTagName(firstNode)[i].childNodes if child.nodeType in [1,8]):
+            if child.nodeType == 8 or child.getAttribute('TagName') == 'Flows' or (child.nodeName not in attr and (not child.getAttribute('Name') or child.getAttribute('Name') not in attr)):
                 self.__sm__('Remove child: ' + child.nodeName)
                 toRemove.extend((child,child.previousSibling))
         parent = xmlDoc.getElementsByTagName(firstNode)[i]
@@ -169,14 +177,14 @@ class Main(object):
                 filename = os.path.splitext(name)[0].lower()
                 filePath = os.path.join(root,name)
                 fileDir = os.path.basename(os.path.dirname(filePath)).lower()
-                if all([not filePath.endswith('.gdb'), not fileDir.endswith('.gdb'),name.lower() not in layers, fileDir not in layers,filename not in layers,filename[:-4] not in layers,os.path.dirname(filePath) != os.path.join(stateFolder, "bc_layers","info")]) or name.endswith('.mdb'):
+                if name.endswith('.mdb') or name.endswith('.zip') or all([not filePath.endswith('.gdb'), not fileDir.endswith('.gdb'),name.lower() not in layers, fileDir not in layers,filename not in layers,filename[:-4] not in layers,os.path.dirname(filePath) != os.path.join(stateFolder, "bc_layers","info")]):
                     if os.path.dirname(filePath) not in fileDirs:
                         fileDirs.append(os.path.dirname(filePath))
                     self.__sm__('deleted file: ' + filePath)
                     os.remove(filePath)
             for d in (d for d in dirs if d.lower().endswith('.gdb')):
-                upperDir = os.path.basename(os.path.dirname(os.path.join(root, d)))
-                if upperDir == "archydro" and not d.lower() == "global.gdb": # remove old global.gdbs
+                parentDir = os.path.basename(os.path.dirname(os.path.join(root, d)))
+                if parentDir == "archydro" and not d.lower() == "global.gdb": # remove old global.gdbs
                     try:
                         arcpy.Delete_management(os.path.join(root, d))
                         self.__sm__('deleted: ' + os.path.join(root, d))
@@ -191,7 +199,7 @@ class Main(object):
                         for fc in (fc for fc in fclasses if fc.lower() not in layers):
                             try:
                                 arcpy.Delete_management(fc)
-                                self.__sm__('removing: ' + fc)
+                                self.__sm__('removed: ' + fc)
                             except:
                                 self.__sm__('Could not remove ' + fc)
                     if not fclasses or len(arcpy.ListFeatureClasses()) == 0:
@@ -220,7 +228,7 @@ class Main(object):
                             self.__sm__('array dtype: ' + str(arr.dtype))
                         except:
                             tb = traceback.format_exc() 
-                            self.__sm__("Error  converting raster to numpy: "+tb + '\n',"ERROR")
+                            self.__sm__("Error converting raster to numpy: "+tb + '\n',"ERROR")
 
     def __sm__(self, msg, type = 'INFO'):
         self.Message += type +':' + msg.replace('_',' ') + '_'

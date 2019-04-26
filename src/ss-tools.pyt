@@ -315,7 +315,8 @@ class basinDelin(object):
 
         except:
             tb = traceback.format_exc()
-            messages.addErrorMessage(tb)
+            if "SystemExit" not in tb:
+                messages.addErrorMessage(tb)
 
         if arcpy.Exists(GW_file):
             messages.addMessage('Placing on Map')
@@ -339,7 +340,8 @@ class basinDelin(object):
                         messages.addMessage("Parameters: " + (',').join(params))
                 except:
                     tb = traceback.format_exc()
-                    messages.addErrorMessage(tb)
+                    if "SystemExit" not in tb:
+                        messages.addErrorMessage(tb)
 
         else:
             if ssdel.error != "":
@@ -423,7 +425,8 @@ class basinParams(object):
 
         except:
             tb = traceback.format_exc()
-            messages.addErrorMessage(tb)
+            if "SystemExit" not in tb:
+                messages.addErrorMessage(tb)
         finally:
             arcMessages = arcpy.GetMessages()
             if arcMessages.find('ERROR') > -1 or arcMessages.find('Failed') > -1:
@@ -562,4 +565,5 @@ class pullS3(object):
             PullFromS3(parameters)
         except:
             tb = traceback.format_exc()
-            messages.addErrorMessage(tb)
+            if "SystemExit" not in tb:
+                messages.addErrorMessage(tb)
