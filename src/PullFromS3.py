@@ -42,7 +42,7 @@ class Main(object):
         self.Message = ""
         workspace = parameters[3]
 
-        self.__TempLocation__ = os.path.join(workspace, "Temp" + time.strftime('%Y%m%d%H%M%S'))
+        self.__TempLocation__ = os.path.join(workspace, "Temp")
 
         if not os.path.exists(self.__TempLocation__): 
             os.makedirs(self.__TempLocation__)
@@ -111,8 +111,8 @@ class Main(object):
             for state in self.states:
                 state_folder = os.path.join(workspace, state)
                 dest_state = destinationBucket + '/data/' + state.lower()
-                xml_loc = 'E:/xml/StreamStats' + state.upper() + '.xml'
-                dest_xml = destinationBucket +  '/xml/StreamStats' + state.upper() + '.xml'
+                xml_loc = os.path.join(state_folder, 'StreamStats' + state.upper() + '.xml')
+                dest_xml = dest_state +  '/StreamStats' + state.upper() + '.xml'
                 self.__sm__('Processing: ' + state)
                 arcpy.AddMessage('Processing: ' + state)
                 
@@ -133,13 +133,13 @@ class Main(object):
                 if any([copy_xml == 'true', copy_archydro == 'true', copy_bc_layers == 'true', copy_whole == 'true', huc_ids]):
                     self.__copyS3__(dest_xml, xml_loc, '')
                 if copy_schema == 'true' or copy_whole == 'true':
-                    schema_path = '/schemas/' + state.upper() + '_ss.gdb/'
-                    schema_path1 = '/schemas/' + state.lower() + '_ss.gdb/'
+                    schema_path = '/' + state.upper() + '_ss.gdb/'
+                    schema_path1 = '/' + state.lower() + '_ss.gdb/'
                     schema_gdb = '/' + state.upper() + '_ss.gdb'
                     if self.__checkS3Bucket__(destinationBucket + schema_path) == 'True':
-                        self.__copyS3__(destinationBucket + schema_path, 'E:/schemas' + schema_gdb, '--recursive')
+                        self.__copyS3__(destinationBucket + schema_path, state_folder + schema_gdb, '--recursive')
                     elif self.__checkS3Bucket__(destinationBucket + schema_path1) == 'True':
-                        self.__copyS3__(destinationBucket + schema_path1, 'E:/schemas' + schema_gdb, '--recursive')
+                        self.__copyS3__(destinationBucket + schema_path1, state_folder + schema_gdb, '--recursive')
                 if copy_whole == 'true':
                     self.__copyS3__(dest_state + '/', state_folder, '--recursive')
                     ParseData(state_folder, state, tempLocation, xml_loc , 'true', 'true', huc_ids, copy_global, 'pull')

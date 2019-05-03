@@ -56,7 +56,7 @@ class Main(object):
     #endregion  
          
     #Private Methods
-    def __run__(self, xmlPath, stateFolder, tempLoc, copy_archydro, copy_bc_layers, huc_folders, direction):
+    def __run__(self, xmlPath, stateFolder, tempLoc, copy_archydro, copy_bc_layers, huc_folders, copy_global, direction):
         try:
             state = os.path.basename(stateFolder).upper()
             self.__sm__('initialized')

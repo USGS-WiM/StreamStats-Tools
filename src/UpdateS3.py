@@ -42,7 +42,7 @@ class Main(object):
         self.Message = ""
         workspace = parameters[4]
 
-        self.__TempLocation__ = os.path.join(workspace, "Temp" + time.strftime('%Y%m%d%H%M%S'))
+        self.__TempLocation__ = os.path.join(workspace, "Temp")
 
         if not os.path.exists(self.__TempLocation__): 
             os.makedirs(self.__TempLocation__)
