@@ -161,7 +161,7 @@ class Main(object):
                         if os.path.isdir(huc_folder):
                             huc_id = os.path.basename(huc_folder)
                             commands.append('huc ' + huc_id)
-                            self.__copyS3__(huc_folder, destinationBucket + '/' + state.lower() + '/archydro/' + huc_id, '--recursive')
+                            self.__copyS3__(os.path.join(state_folder, 'archydro', huc_id), destinationBucket + '/' + state.lower() + '/archydro/' + huc_id, '--recursive')
                         else:
                             self.__sm__('Huc folder not found: ' + huc_folder)
                             arcpy.AddError('Huc folder not found: ' + huc_folder)
@@ -170,7 +170,7 @@ class Main(object):
             seperator = ','
             commands = seperator.join(commands)
                 
-            self.__logData__(destinationBucket, workspace,state, accessKeyID, commands, user_name, logNote)
+            self.__logData__(destinationBucket, tempLocation, state, accessKeyID, commands, user_name, logNote)
 
             self.isComplete = True
             self.__sm__('Finished \n')
@@ -183,25 +183,28 @@ class Main(object):
                 arcpy.AddError(tb)
             self.isComplete = False
 
-    def __configureAWSKeyID__(self, AWSKeyID):
-                """configureAWSKeyID(AWSKeyID=None)
-                    Function to configure AWS Access Key ID
-                """
-                #create AWS CLI command
-                cmd="aws configure set aws_access_key_id " + AWSKeyID
+        finally:
+            arcpy.ResetEnvironments()
 
-                try:
-                    output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
-                except subprocess.CalledProcessError as e:
-                    #messages.addErrorMessage('Configure not successful.  Please make sure you have inserted the correct credentials.')
-                    self.__sm__(e.output, 'ERROR')
-                    arcpy.AddError(e.output)
-                    tb = traceback.format_exc()
-                    self.__sm__(tb, 'ERROR')
-                    arcpy.AddError(tb)
-                    sys.exit()
-                else:
-                    self.__sm__('Finished configuring AWS Key ID') 
+    def __configureAWSKeyID__(self, AWSKeyID):
+        """configureAWSKeyID(AWSKeyID=None)
+            Function to configure AWS Access Key ID
+        """
+        #create AWS CLI command
+        cmd="aws configure set aws_access_key_id " + AWSKeyID
+
+        try:
+            output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
+        except subprocess.CalledProcessError as e:
+            #messages.addErrorMessage('Configure not successful.  Please make sure you have inserted the correct credentials.')
+            self.__sm__(e.output, 'ERROR')
+            arcpy.AddError(e.output)
+            tb = traceback.format_exc()
+            self.__sm__(tb, 'ERROR')
+            arcpy.AddError(tb)
+            sys.exit()
+        else:
+            self.__sm__('Finished configuring AWS Key ID') 
     def __configureAWSKey__(self, AWSAccessKey):
         """configureAWSKey(AWSAccessKey=None)
             Function to configure AWS CLI Access Key
@@ -374,8 +377,9 @@ class Main(object):
         logger.info('Region: ' + state.upper() + '; Repo version: ' + version + '; User: ' + username + '; AWS Key ID: ' + accessKeyID + '; Items Copied: ' + commands + '; Note: ' + logNote)
 
         self.__copyS3__(logFolder, destFolder, '--recursive')
+        logger.removeHandler(handler)
         logging.shutdown()
-        arcpy.Delete_management(logdir)
+        arcpy.Delete_management(logFolder)
 
     def __sm__(self, msg, type = 'INFO'):
         self.Message += type +':' + msg.replace('_',' ') + '_'

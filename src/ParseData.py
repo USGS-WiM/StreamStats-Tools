@@ -58,9 +58,11 @@ class Main(object):
     #Private Methods
     def __run__(self, xmlPath, stateFolder, tempLoc, copy_archydro, copy_bc_layers, huc_folders, copy_global, direction):
         try:
-            state = os.path.basename(stateFolder).upper()
+            state = None
+            if stateFolder:
+                state = os.path.basename(stateFolder).upper()
             self.__sm__('initialized')
-            if xmlPath and state.upper() != "MO_STL":
+            if xmlPath and (state is None or state.upper() != "MO_STL"):
                 arcpy.AddMessage('Parsing xml')
                 if direction == 'upload':
                     shutil.copy(xmlPath, tempLoc)
