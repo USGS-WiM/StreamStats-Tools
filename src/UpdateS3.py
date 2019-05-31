@@ -40,9 +40,9 @@ class Main(object):
     def __init__(self, parameters):
         self.isComplete = False
         self.Message = ""
-        workspace = parameters[4]
+        workspace = parameters[5]
 
-        self.__TempLocation__ = os.path.join(workspace, "Temp")
+        self.__TempLocation__ = os.path.join(workspace, "Temp" + time.strftime('%Y%m%d%H%M%S'))
 
         if not os.path.exists(self.__TempLocation__): 
             os.makedirs(self.__TempLocation__)
@@ -62,18 +62,19 @@ class Main(object):
 
     def __run__(self, parameters, tempLocation):
         self.__sm__('Initialized')
-        logNote        = parameters[0]
-        accessKeyID    = parameters[1]
-        accessKey      = parameters[2]
-        editorName     = parameters[3]
-        workspace      = parameters[4]
-        state_folder   = parameters[5]
-        xml_file       = parameters[6]
-        copy_bc_layers = parameters[7]
-        copy_archydro  = parameters[8]
-        copy_global    = parameters[9]
-        huc_folders    = parameters[10]
-        schema_file    = parameters[11]
+        regionID       = parameters[0]
+        logNote        = parameters[1]
+        accessKeyID    = parameters[2]
+        accessKey      = parameters[3]
+        editorName     = parameters[4]
+        workspace      = parameters[5]
+        state_folder   = parameters[6]
+        xml_file       = parameters[7]
+        copy_bc_layers = parameters[8]
+        copy_archydro  = parameters[9]
+        copy_global    = parameters[10]
+        huc_folders    = parameters[11]
+        schema_file    = parameters[12]
         
         arcpy.env.overwriteOutput = True
 
@@ -93,84 +94,96 @@ class Main(object):
 
         self.states = ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "CRB","DC", "DE", "DRB", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MO_ST", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "RRB", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"]
 
-
-        commands = []
         try:
             if (copy_archydro == 'true' or copy_bc_layers == 'true' or copy_global == 'true' or huc_folders) and not state_folder:
                 print 'ERROR: A state folder is required for one or more functions.'
                 self.__sm__('A state folder is required for one or more functions.', 'ERROR')
                 sys.exit()
-            if state_folder and not xml_file:
+            if state_folder and not xml_file and regionID != 'all':
                 print 'ERROR: An .xml file is required for parsing the data before upload.'
                 self.__sm__('An .xml file is required for parsing the data before upload.', 'ERROR')
                 sys.exit()
+            if regionID.upper() not in self.states and regionID != 'all':
+                print 'ERROR: Region ID not found. Please use the region abbreviation, e.g. "AK" or "ak" for Alaska'
+                self.__sm__('Region ID not found. Please use the region abbreviation, e.g. "AK" or "ak" for Alaska', 'ERROR')
+                sys.exit()
+            elif regionID != 'all':
+                self.states = [regionID.upper()]
             #check for xml file input
-            if xml_file:
-                self.__sm__('Now processing xml: ' + xml_file)
-                filename = xml_file.replace('\\','/').split('/')[-1]
-                state = filename.split('.xml')[0].split('StreamStats')[1].upper()
-                parse = ParseData(state_folder, state, tempLocation, xml_file, copy_archydro, copy_bc_layers, huc_folders, copy_global, 'upload')
-                parse_file = parse.__xmlPath__
-                checkXML = self.__validateStreamStatsXML__(xml_file)
-                if arcpy.Exists(parse_file) and checkXML:
-                    commands.append('xml')
-                    self.__copyS3__(parse_file, destinationBucket + '/' + state.lower() + '/' + filename, '')
-                else:
-                    print "There is no valid .xml file.  File should be named 'Streamstats" + state + ".xml'."
-                    self.__sm__("There is no valid .xml file.  File should be named 'Streamstats" + state + ".xml'.", 'ERROR')
-                    sys.exit()
+            for state in self.states:
+                commands = []
+                if regionID == 'all':
+                    state_folder = 'C:\Users\kjacobsen\Documents\wim_projects\docs\ss\cmdLine_test/' + state.lower() #change with E:/data/""
+                    xml_file = os.path.join(state_folder, 'StreamStats' + state.upper() + '.xml')
+                    schema_file = os.path.join(state_folder, state.upper() + '_ss.gdb')
+                    if not os.path.isdir(schema_file):
+                        schema_file = os.path.join(state_folder, state.lower() + '_ss.gdb')
+                if xml_file:
+                    self.__sm__('Now processing xml: ' + xml_file)
+                    filename = xml_file.replace('\\','/').split('/')[-1]
+                    state = filename.split('.xml')[0].split('StreamStats')[1].upper()
+                    parse = ParseData(state_folder, state, tempLocation, xml_file, copy_archydro, copy_bc_layers, huc_folders, copy_global, 'upload')
+                    parse_file = parse.__xmlPath__
+                    checkXML = self.__validateStreamStatsXML__(xml_file)
+                    if arcpy.Exists(parse_file) and checkXML:
+                        commands.append('xml')
+                        self.__copyS3__(parse_file, destinationBucket + '/' + state.lower() + '/' + filename, '')
+                    else:
+                        print "There is no valid .xml file.  File should be named 'Streamstats" + state + ".xml'."
+                        self.__sm__("There is no valid .xml file.  File should be named 'Streamstats" + state + ".xml'.", 'ERROR')
+                        sys.exit()
 
-            if schema_file:
-                self.__sm__('Now processing schema: ' + schema_file)
-                schemaType = self.__validateStreamStatsSchema__(schema_file)
-                rootname = schema_file.replace('\\','/').split('/')[-1]
-                state = rootname.split('_ss.gdb')[0].lower()
+                if schema_file:
+                    self.__sm__('Now processing schema: ' + schema_file)
+                    print 'Now processing schema: ' + schema_file
+                    schemaType = self.__validateStreamStatsSchema__(schema_file)
+                    rootname = schema_file.replace('\\','/').split('/')[-1]
+                    state = rootname.split('_ss.gdb')[0].lower()
 
-                if schemaType == 'fgdb':
-                    commands.append('schema')
-                    self.__copyS3__(schema_file, destinationBucket + '/' + state.lower() + '/' + rootname, '--recursive')
+                    if schemaType == 'fgdb':
+                        commands.append('schema')
+                        self.__copyS3__(schema_file, destinationBucket + '/' + state.lower() + '/' + rootname, '--recursive')
 
-            if state_folder:
-                state = os.path.basename(state_folder).lower()
-                self.__sm__('Processing: ' + state)
-                arcpy.AddMessage('Processing: ' + state)
-                if not parse_file:
-                    parse = ParseData(state_folder, state, workspace, xml_file, copy_archydro, copy_bc_layers, huc_folders, 'upload')
-                state_folder = parse.__stateFolder__
-                self.__sm__("new state folder: " + state_folder)
-                    
-                if copy_archydro == 'true' and self.__validateStreamStatsDataFolder__(state_folder, 'archydro'):
-                    commands.append('archydro')
-                    self.__copyS3__(state_folder + '/archydro',destinationBucket + '/' + state.lower() + '/archydro', '--recursive')
+                if state_folder:
+                    self.__sm__('Processing: ' + state)
+                    arcpy.AddMessage('Processing: ' + state)
+                    if not parse_file:
+                        parse = ParseData(state_folder, state, workspace, xml_file, copy_archydro, copy_bc_layers, huc_folders, 'upload')
+                    state_folder = parse.__stateFolder__
+                    self.__sm__("new state folder: " + state_folder)
+                        
+                    if copy_archydro == 'true' and self.__validateStreamStatsDataFolder__(state_folder, 'archydro'):
+                        commands.append('archydro')
+                        self.__copyS3__(state_folder + '/archydro',destinationBucket + '/' + state.lower() + '/archydro', '--recursive')
 
-                if copy_bc_layers == 'true' and self.__validateStreamStatsDataFolder__(state_folder, 'bc_layers'):
-                    commands.append('bc_layers')
-                    self.__copyS3__(state_folder + '/bc_layers',destinationBucket + '/' + state.lower() + '/bc_layers', '--recursive')
+                    if copy_bc_layers == 'true' and self.__validateStreamStatsDataFolder__(state_folder, 'bc_layers'):
+                        commands.append('bc_layers')
+                        self.__copyS3__(state_folder + '/bc_layers',destinationBucket + '/' + state.lower() + '/bc_layers', '--recursive')
 
-                global_gdb = os.path.join(state_folder, 'archydro', 'global.gdb')
-                if copy_global == 'true' and os.path.isdir(global_gdb):
-                    commands.append('global.gdb')
-                    self.__copyS3__(global_gdb, destinationBucket + '/' + state.lower() + '/archydro/global.gdb', '--recursive')
-                if huc_folders:
-                    huc_folders = huc_folders.split(';')
-                    for huc_folder in huc_folders:
-                        if '/' in huc_folder: #not the best way to do it
-                            huc_folder = huc_folder
-                        else:
-                            huc_folder = os.path.join(state_folder,'archydro', huc_folder)
-                        if os.path.isdir(huc_folder):
-                            huc_id = os.path.basename(huc_folder)
-                            commands.append('huc ' + huc_id)
-                            self.__copyS3__(huc_folder, destinationBucket + '/' + state.lower() + '/archydro/' + huc_id, '--recursive')
-                        else:
-                            print 'Huc folder not found: ' + huc_folder
-                            self.__sm__('Huc folder not found: ' + huc_folder, 'ERROR')
-                ##parse.__checkPixelDepth__(state_folder) ##skip this step when running from command line
+                    global_gdb = os.path.join(state_folder, 'archydro', 'global.gdb')
+                    if copy_global == 'true' and os.path.isdir(global_gdb):
+                        commands.append('global.gdb')
+                        self.__copyS3__(global_gdb, destinationBucket + '/' + state.lower() + '/archydro/global.gdb', '--recursive')
+                    if huc_folders:
+                        huc_folders = huc_folders.split(';')
+                        for huc_folder in huc_folders:
+                            if '/' in huc_folder: #not the best way to do it
+                                huc_folder = huc_folder
+                            else:
+                                huc_folder = os.path.join(state_folder,'archydro', huc_folder)
+                            if os.path.isdir(huc_folder):
+                                huc_id = os.path.basename(huc_folder)
+                                commands.append('huc ' + huc_id)
+                                self.__copyS3__(huc_folder, destinationBucket + '/' + state.lower() + '/archydro/' + huc_id, '--recursive')
+                            else:
+                                print 'Huc folder not found: ' + huc_folder
+                                self.__sm__('Huc folder not found: ' + huc_folder, 'ERROR')
+                        ##parse.__checkPixelDepth__(state_folder) ##skip this step when running from command line
 
-            seperator = ','
-            commands = seperator.join(commands)
-			
-            self.__logData__(destinationBucket, workspace,state, accessKeyID, commands, user_name, logNote)
+                seperator = ','
+                commands = seperator.join(commands)
+                
+                self.__logData__(destinationBucket, workspace,state, accessKeyID, commands, user_name, logNote)
 
             self.isComplete = True
             self.__sm__('Finished \n')
@@ -373,37 +386,39 @@ class Main(object):
 if __name__ == '__main__':
     #add stuff here for args, etc. if using from command line
     """
-        logNote        = parameters[0].valueAsText
-        accessKeyID    = parameters[1].valueAsText
-        accessKey      = parameters[2].valueAsText
-        editorName     = parameters[3].valueAsText
-        workspace      = parameters[4].valueAsText
-        state_folder   = parameters[5].valueAsText
-        xml_file       = parameters[6].valueAsText
-        copy_bc_layers = parameters[7].valueAsText
-        copy_archydro  = parameters[8].valueAsText
-        copy_global    = parameters[9].valueAsText
-        huc_folders    = parameters[10].valueAsText
-        schema_file    = parameters[11].valueAsText
+        region_id      = parameters[0].valueAsText
+        logNote        = parameters[1].valueAsText
+        accessKeyID    = parameters[2].valueAsText
+        accessKey      = parameters[3].valueAsText
+        editorName     = parameters[4].valueAsText
+        workspace      = parameters[5].valueAsText
+        state_folder   = parameters[6].valueAsText
+        xml_file       = parameters[7].valueAsText
+        copy_bc_layers = parameters[8].valueAsText
+        copy_archydro  = parameters[9].valueAsText
+        copy_global    = parameters[10].valueAsText
+        huc_folders    = parameters[11].valueAsText
+        schema_file    = parameters[12].valueAsText
     C:\Users\kjacobsen\Desktop\StreamStats-Tools\src\UpdateS3.py(['testing', accessKeyID, accessKey, editorName, workspace, state_folder, xml_file, 'true', 'true', 'false',,schema_file])
     """
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-logNote", help="describes the purpose of the the upload, and any changes made to the data", type=str, default="Testing")
+    parser.add_argument("-region_id", help="specifies the regional folder to pull from S3", type=str, default='ct')
+    parser.add_argument("-logNote", help="describes the purpose of the the upload, and any changes made to the data", type=str, default="Uploading xmls")
     parser.add_argument("-accessKeyID", help="specifies the AWS Access Key ID for the person updating the data", type=str, default='xxxxxxxxxxxxxxxxxxxx')
     parser.add_argument("-accessKey", help="specifies the AWS Secret Access Key of the person updating the data", type=str, default='xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx')
     parser.add_argument("-editorName", help="specifies the name of the person who edited/is uploading the data", type=str, default="Editor Name")
     parser.add_argument("-workspace", help="specifies the temporary workspace where the regional data will go before parsing and uploading", type=str, default=r'')
     parser.add_argument("-state_folder", help="specifies the regional folder containing 'archydro' and bc_layers' folders", type=str, default=r'E:\data\vt')
-    parser.add_argument("-xml_file", help="specifies the regional xml file' folders", type=str, default=r'E:\xml\StreamStatsVT.xml')
+    parser.add_argument("-xml_file", help="specifies the regional xml file' folders", type=str, default=r'E:\vt\StreamStatsVT.xml')
     parser.add_argument("-copy_bc_layers", help="indicates whether to copy the entire bc_layers folder", type=str, default='true')
     parser.add_argument("-copy_archydro", help="indicates whether to copy the entire archydro folder", type=str, default='true')
     parser.add_argument("-copy_global", help="indicates whether to copy the global.gdb", type=str, default='false')
     parser.add_argument("-huc_folders", help="indicates which huc folders to upload", type=str, default='')
-    parser.add_argument("-schema_file", help="specifies the location of the regional schema .gdb", type=str, default=r'E:\schemas\VT_ss.gdb')
+    parser.add_argument("-schema_file", help="specifies the location of the regional schema .gdb", type=str, default=r'E:\vt\VT_ss.gdb')
 
     args = parser.parse_args()
     parameters = []
-    parameters.extend((args.logNote, args.accessKeyID, args.accessKey, args.editorName, args.workspace, args.state_folder, args.xml_file ,args.copy_bc_layers, 
+    parameters.extend((args.region_id, args.logNote, args.accessKeyID, args.accessKey, args.editorName, args.workspace, args.state_folder, args.xml_file ,args.copy_bc_layers, 
         args.copy_archydro,args.copy_global, args.huc_folders, args.schema_file))
     Main(parameters)    

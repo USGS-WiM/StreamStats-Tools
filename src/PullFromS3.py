@@ -42,7 +42,7 @@ class Main(object):
         self.Message = ""
         workspace = parameters[3]
 
-        self.__TempLocation__ = os.path.join(workspace, "Temp")
+        self.__TempLocation__ = os.path.join(workspace, "Temp" + time.strftime('%Y%m%d%H%M%S'))
 
         if not os.path.exists(self.__TempLocation__): 
             os.makedirs(self.__TempLocation__)
@@ -90,7 +90,7 @@ class Main(object):
         destinationBucket = 's3://streamstats-staged-data'
 
         self.states = ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "CRB","DC", "DE", "DRB", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MO_STL", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "RRB", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"]
-        
+
 
         try:
             if not regionID:
@@ -112,7 +112,7 @@ class Main(object):
                 state_folder = os.path.join(workspace, state)
                 dest_state = destinationBucket + '/data/' + state.lower()
                 xml_loc = os.path.join(state_folder, 'StreamStats' + state.upper() + '.xml')
-                dest_xml = dest_state +  '/StreamStats' + state.upper() + '.xml'
+                dest_xml = destinationBucket + '/xml' +  '/StreamStats' + state.upper() + '.xml'
                 self.__sm__('Processing: ' + state)
                 arcpy.AddMessage('Processing: ' + state)
                 
