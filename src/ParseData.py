@@ -76,6 +76,7 @@ class Main(object):
                 self.__thinXML__(xmlPath, "ApFunctions", 0, {"GlobalPointDelineation", "WshParams"})
                 self.__thinXML__(xmlPath, "ApFunction", 0, {"ApFields", "ApLayers", "DataPath", "GlobalDataPath", "SnapToleranceNumCells", "CleanupThresholdNumCells", "RASTERDATAPATH", "VECTORDATAPATH", "ParameterDelimiter", "NetworkName", "RelationshipName", "FromProjectionFileName", "GlobalParameter"})
                 self.__thinXML__(xmlPath, "ApFunction", 1, {"ApFields", "ApLayers", "DataPath", "GlobalDataPath", "SnapToleranceNumCells", "CleanupThresholdNumCells", "RASTERDATAPATH", "VECTORDATAPATH", "ParameterDelimiter", "NetworkName", "RelationshipName", "FromProjectionFileName", "GlobalParameter"})
+                self.__replaceProjection__(xmlPath)
 
                 if stateFolder:
                     wshLayers = self.__getXMLLayers__(xmlPath, "wsh") #get layers necessary for basin characteristics
@@ -148,6 +149,21 @@ class Main(object):
             parent.removeChild(child)
         file = open(xmlfile,"wb")
         xmlDoc.writexml(file)
+    def __replaceProjection__(self, xmlfile):
+        xmlDoc = ET.parse(xmlfile)
+        xPath = ".//ApFunction[@TagName='WshParams']/ApFields/ApField"
+        xPath2 = ".//ApFunction[@TagName='WshParams']/ApFields/ApField/ApLayer/ApFields/ApField"
+        root = xmlDoc.getroot()
+        for child in root.iter():
+            if 'AdditionalParams' in child.attrib and 'PROJECTIONFILENAME' in child.attrib['AdditionalParams'] and 'schemas' in child.attrib['AdditionalParams']:
+                start_sect = child.attrib['AdditionalParams'].split('PROJECTIONFILENAME')[0]
+                end_sect = child.attrib['AdditionalParams'].split('PROJECTIONFILENAME')[1].split('schemas')[1]
+                self.__sm__('before: ' + child.attrib['AdditionalParams'])
+                child.set('AdditionalParams', start_sect + 'PROJECTIONFILENAME=e:\projections' + end_sect)
+                self.__sm__('after: ' + child.attrib['AdditionalParams'])
+                
+        file = open(xmlfile,"wb")
+        xmlDoc.write(file)
     def __getXMLLayers__(self, xmlfile, layerType):
         # parse XML to get layers needed for basin delineation (delin) and characteristics (wsh)
         layers = []
