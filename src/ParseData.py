@@ -71,11 +71,12 @@ class Main(object):
                     else:
                         self.__thinXML__(xmlPath, "StreamStatsConfig", 0, "ProgParams")
                 except:
-                    self.__thinXML__(xmlPath, "StreamStatsConfig" + state, 0, "ProgParams")
+                    self.__thinXML__(xmlPath, "StreamStatsConfig" + state.upper(), 0, "ProgParams")
                 self.__thinXML__(xmlPath, "ProgParams", 0, {"ApFunctions", "TempLocation"})
                 self.__thinXML__(xmlPath, "ApFunctions", 0, {"GlobalPointDelineation", "WshParams"})
                 self.__thinXML__(xmlPath, "ApFunction", 0, {"ApFields", "ApLayers", "DataPath", "GlobalDataPath", "SnapToleranceNumCells", "CleanupThresholdNumCells", "RASTERDATAPATH", "VECTORDATAPATH", "ParameterDelimiter", "NetworkName", "RelationshipName", "FromProjectionFileName", "GlobalParameter"})
                 self.__thinXML__(xmlPath, "ApFunction", 1, {"ApFields", "ApLayers", "DataPath", "GlobalDataPath", "SnapToleranceNumCells", "CleanupThresholdNumCells", "RASTERDATAPATH", "VECTORDATAPATH", "ParameterDelimiter", "NetworkName", "RelationshipName", "FromProjectionFileName", "GlobalParameter"})
+                self.__replaceProjection__(xmlPath)
 
                 if stateFolder:
                     wshLayers = self.__getXMLLayers__(xmlPath, "wsh") #get layers necessary for basin characteristics
@@ -83,8 +84,7 @@ class Main(object):
                     layers = wshLayers + delinLayers
                     if direction == 'upload':
                         stateFolder = self.__copydata__(stateFolder, tempLoc, copy_archydro, copy_bc_layers, huc_folders, copy_global)
-
-                    if copy_archydro == 'true' or copy_bc_layers == 'true' or huc_folders != '' or copy_global == 'true':
+                    if copy_archydro == 'true' or copy_bc_layers == 'true' or copy_global == 'true' or (huc_folders and huc_folders != ''):
                         arcpy.AddMessage('Parsing state data for: ' + state)
                         self.__deleteFiles__(stateFolder, layers) #uses layers taken from xml to delete unnecessary files
                     arcpy.ResetEnvironments()
@@ -149,6 +149,21 @@ class Main(object):
             parent.removeChild(child)
         file = open(xmlfile,"wb")
         xmlDoc.writexml(file)
+    def __replaceProjection__(self, xmlfile):
+        xmlDoc = ET.parse(xmlfile)
+        xPath = ".//ApFunction[@TagName='WshParams']/ApFields/ApField"
+        xPath2 = ".//ApFunction[@TagName='WshParams']/ApFields/ApField/ApLayer/ApFields/ApField"
+        root = xmlDoc.getroot()
+        for child in root.iter():
+            if 'AdditionalParams' in child.attrib and 'PROJECTIONFILENAME' in child.attrib['AdditionalParams']:
+                start_sect = child.attrib['AdditionalParams'].split('PROJECTIONFILENAME')[0]
+                end_sect = child.attrib['AdditionalParams'].split('PROJECTIONFILENAME')[1].split('schemas')[1]
+                self.__sm__('before: ' + child.attrib['AdditionalParams'])
+                child.set('AdditionalParams', start_sect + 'PROJECTIONFILENAME=e:\projections' + end_sect)
+                self.__sm__('after: ' + child.attrib['AdditionalParams'])
+                
+        file = open(xmlfile,"wb")
+        xmlDoc.write(file)
     def __getXMLLayers__(self, xmlfile, layerType):
         # parse XML to get layers needed for basin delineation (delin) and characteristics (wsh)
         layers = []
