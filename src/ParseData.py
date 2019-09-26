@@ -24,6 +24,7 @@ import xml.dom.minidom
 import xml.etree.ElementTree as ET
 import numpy
 import shutil
+import json
 #endregion
 
 
@@ -60,6 +61,10 @@ class Main(object):
         try:
             state = self.RegionID
             self.__sm__('initialized')
+            with open(os.path.join(os.path.dirname( __file__ ), 'config.json')) as c:
+                config = json.load(c)
+                necessaryXMLNodes = config[0]["necessaryXMLNodes"]
+
             if xmlPath and state.upper() != "MO_STL":
                 arcpy.AddMessage('Parsing xml')
                 if direction == 'upload':
@@ -67,15 +72,15 @@ class Main(object):
                     xmlPath = os.path.join(tempLoc, os.path.basename(xmlPath))
                 try:
                     if state == 'HI':
-                        self.__thinXML__(xmlPath, "StreamStatsConfig", 0,  {"ProgParams","TemplateView"}) #removes unnecessary nodes from xml
+                        self.__thinXML__(xmlPath, "StreamStatsConfig", 0, necessaryXMLNodes) #removes unnecessary nodes from xml
                     else:
-                        self.__thinXML__(xmlPath, "StreamStatsConfig", 0, "ProgParams")
+                        self.__thinXML__(xmlPath, "StreamStatsConfig", 0, necessaryXMLNodes)
                 except:
-                    self.__thinXML__(xmlPath, "StreamStatsConfig" + state.upper(), 0, "ProgParams")
-                self.__thinXML__(xmlPath, "ProgParams", 0, {"ApFunctions", "TempLocation"})
-                self.__thinXML__(xmlPath, "ApFunctions", 0, {"GlobalPointDelineation", "WshParams"})
-                self.__thinXML__(xmlPath, "ApFunction", 0, {"ApFields", "ApLayers", "DataPath", "GlobalDataPath", "SnapToleranceNumCells", "CleanupThresholdNumCells", "RASTERDATAPATH", "VECTORDATAPATH", "ParameterDelimiter", "NetworkName", "RelationshipName", "FromProjectionFileName", "GlobalParameter"})
-                self.__thinXML__(xmlPath, "ApFunction", 1, {"ApFields", "ApLayers", "DataPath", "GlobalDataPath", "SnapToleranceNumCells", "CleanupThresholdNumCells", "RASTERDATAPATH", "VECTORDATAPATH", "ParameterDelimiter", "NetworkName", "RelationshipName", "FromProjectionFileName", "GlobalParameter"})
+                    self.__thinXML__(xmlPath, "StreamStatsConfig" + state.upper(), 0, necessaryXMLNodes)
+                self.__thinXML__(xmlPath, "ProgParams", 0, necessaryXMLNodes)
+                self.__thinXML__(xmlPath, "ApFunctions", 0, necessaryXMLNodes)
+                self.__thinXML__(xmlPath, "ApFunction", 0, necessaryXMLNodes)
+                self.__thinXML__(xmlPath, "ApFunction", 1, necessaryXMLNodes)
                 self.__replaceProjection__(xmlPath)
 
                 if stateFolder:
@@ -155,7 +160,7 @@ class Main(object):
         xPath2 = ".//ApFunction[@TagName='WshParams']/ApFields/ApField/ApLayer/ApFields/ApField"
         root = xmlDoc.getroot()
         for child in root.iter():
-            if 'AdditionalParams' in child.attrib and 'PROJECTIONFILENAME' in child.attrib['AdditionalParams']:
+            if 'AdditionalParams' in child.attrib and 'PROJECTIONFILENAME' in child.attrib['AdditionalParams'] and 'schemas' in child.attrib['AdditionalParams']:
                 start_sect = child.attrib['AdditionalParams'].split('PROJECTIONFILENAME')[0]
                 end_sect = child.attrib['AdditionalParams'].split('PROJECTIONFILENAME')[1].split('schemas')[1]
                 self.__sm__('before: ' + child.attrib['AdditionalParams'])

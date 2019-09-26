@@ -32,7 +32,6 @@ import sys, os, subprocess, fnmatch, traceback
 from ParseData import Main as ParseData
 import datetime, arcpy, json, logging
 import time
-import json
 
 class Main(object):
 
@@ -89,7 +88,9 @@ class Main(object):
 
         destinationBucket = 's3://streamstats-staged-data'
 
-        self.states = ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "CRB","DC", "DE", "DRB", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MO_STL", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "RRB", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"]
+        with open(os.path.join(os.path.dirname( __file__ ), 'config.json')) as c:
+            config = json.load(c)
+            self.states = config[0]["regions"]
 
 
         try:
@@ -120,7 +121,6 @@ class Main(object):
                     self.__copyS3__(dest_state + '/bc_layers', state_folder + '/bc_layers', '--recursive')
                     
                 if copy_archydro == 'true':
-                    arcpy.AddMessage('copy_archydro: ' + copy_archydro);
                     self.__copyS3__(dest_state + '/archydro', state_folder + '/archydro', '--recursive')
 
                 if copy_global == 'true':
@@ -136,6 +136,7 @@ class Main(object):
                 if copy_schema == 'true':
                     schema_path = '/' + state.upper() + '_ss.gdb/'
                     schema_path1 = '/' + state.lower() + '_ss.gdb/'
+                    arcpy.AddMessage(self.__checkS3Bucket__(dest_state + schema_path))
                     if self.__checkS3Bucket__(dest_state + schema_path) == 'True':
                         self.__copyS3__(dest_state + schema_path, state_folder + schema_path, '--recursive')
                     elif self.__checkS3Bucket__(dest_state + schema_path1) == 'True':
@@ -170,7 +171,7 @@ class Main(object):
                     self.__sm__(e.output, 'ERROR')
                     arcpy.AddError(e.output)
                     tb = traceback.format_exc()
-                    self.__sm__(b, 'ERROR')
+                    self.__sm__(tb, 'ERROR')
                     arcpy.AddError(tb)
                     sys.exit()
                 else:
@@ -214,8 +215,6 @@ class Main(object):
             except subprocess.CalledProcessError as e:
                 tb = traceback.format_exc()
                 if 'lock' not in e.output and 'exit status 2' not in tb:
-                    arcpy.AddError('Make sure AWS CLI has been installed')
-                    self.__sm__('Make sure AWS CLI has been installed', 'ERROR')
                     self.__sm__(e.output, 'ERROR')
                     arcpy.AddError(e.output)
                     self.__sm__(tb, 'ERROR')
@@ -230,21 +229,13 @@ class Main(object):
         """checkS3Bucket(fileLocation=None)
             function to check for existence of files in s3 bucket
         """
-        cmd = "aws s3 ls " + fileLocation + " | wc -l"
+        cmd = "aws s3 ls " + fileLocation
         try:
             output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
-            if '0' in output:
-                return 'False'
-            else:
-                return 'True'
+            return 'True'
 
         except subprocess.CalledProcessError as e:
-            self.__sm__(e.output, 'ERROR')
-            arcpy.AddError(e.output)
-            tb = traceback.format_exc()
-            self.__sm__(tb, 'ERROR')
-            arcpy.AddError(tb)
-            sys.exit()
+            return 'False'
         else:
             self.__sm__('Received list of elements in bucket')
 

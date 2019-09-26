@@ -108,8 +108,6 @@ class BasinParameters(object):
 
             self.__sm__(arcpy.GetMessages(),'AHMSG')
             arcpy.CheckInExtension("Spatial")
-            self.__sm__("finished calc params")
-            arcpy.AddMessage("finished calc params")
 
             plist = self.__parseParameterXML__(outputFile.format(".xml"))
             if (len(plist) < 1):
@@ -118,6 +116,8 @@ class BasinParameters(object):
             self.ParameterList = plist
             self.isComplete = True
 
+            self.__sm__("finished calc params")
+            arcpy.AddMessage("finished calc params")
             self.__sm__("finished \n")
         except:
             tb = traceback.format_exc() 

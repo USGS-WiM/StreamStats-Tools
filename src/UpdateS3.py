@@ -91,8 +91,10 @@ class Main(object):
 
         destinationBucket = 's3://streamstats-staged-data/test-data'
 
-        self.states = ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "CRB","DC", "DE", "DRB", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MO_STL", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "RRB", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"]
-
+        with open(os.path.join(os.path.dirname( __file__ ), 'config.json')) as c:
+            config = json.load(c)
+            self.version = config[0]["version"]
+            self.states = config[0]["regions"]
 
         commands = []
         try:
@@ -108,17 +110,19 @@ class Main(object):
             if xml_file:
                 self.__sm__('Now processing xml: ' + xml_file)
                 filename = xml_file.replace('\\','/').split('/')[-1]
-                state = filename.split('.xml')[0].split('StreamStats')[1].upper()
-                parse = ParseData(state_folder, state, tempLocation, xml_file, copy_archydro, copy_bc_layers, huc_folders, copy_global, 'upload')
-                parse_file = parse.__xmlPath__
-                checkXML = self.__validateStreamStatsXML__(xml_file)
-                if arcpy.Exists(parse_file) and checkXML:
-                    commands.append('xml')
-                    self.__copyS3__(parse_file, destinationBucket + '/' + state.lower() + '/' + filename, '')
+                if 'StreamStats' in filename:
+                    state = filename.split('.xml')[0].split('StreamStats')[1].upper()
                 else:
-                    self.__sm__("There is no valid .xml file.  File should be named 'Streamstats" + state + ".xml'.", 'ERROR')
-                    arcpy.AddError("There is no valid .xml file.  File should be named 'Streamstats" + state + ".xml'.")
-                    sys.exit()
+                    self.__printXMLError__(filename, '{region abbrevation}')
+                checkXML = self.__validateStreamStatsXML__(xml_file)
+                if checkXML:
+                    parse = ParseData(state_folder, state, tempLocation, xml_file, copy_archydro, copy_bc_layers, huc_folders, copy_global, 'upload')
+                    parse_file = parse.__xmlPath__
+                    commands.append('xml')
+                    if arcpy.Exists(parse_file):
+                        self.__copyS3__(parse_file, destinationBucket + '/' + state.lower() + '/' + filename, '')
+                else:
+                    self.__printXMLError__(filename, state)
 
             if schema_file:
                 self.__sm__('Now processing schema: ' + schema_file)
@@ -232,13 +236,16 @@ class Main(object):
 
         #validate xml file
         stateabbr = filename.split('.xml')[0].split('StreamStats')[1].upper()
-        if fnmatch.fnmatch(filename, 'StreamStats*.xml') and stateabbr in self.states:
+        if (fnmatch.fnmatch(filename, 'StreamStats*.xml') and stateabbr in self.states):
             return True
         else:
-            self.__sm__('You did not select a valid xml file: ' + filename, 'ERROR')
-            arcpy.AddError('You did not select a valid xml file: ' + filename)
-            sys.exit()
-            
+            self.__printXMLError__(filename, stateabbr)
+    
+    def __printXMLError__(self, filename, state):
+        self.__sm__('You did not select a valid xml file: ' + filename + ". File should be named 'Streamstats" + state + ".xml', and '" + state + "' must be an accepted region.", 'ERROR')
+        arcpy.AddError('You did not select a valid xml file: ' + filename + ". File should be named 'Streamstats" + state + ".xml', and '" + state + "' must be an accepted region.")
+        sys.exit()
+
     def __validateStreamStatsSchema__(self, item):
         """validateStreamStatsSchema(item=None)
             Determines if input schema is either a valid .prj file or a valid file geodatabse
@@ -370,11 +377,7 @@ class Main(object):
         formatter.converter = time.gmtime
         handler.setFormatter(formatter)
 
-        with open(os.path.join(os.path.dirname( __file__ ), '..', 'code.json')) as c:
-            codejson = json.load(c)
-            version = codejson[0]["version"]
-
-        logger.info('Region: ' + state.upper() + '; Repo version: ' + version + '; User: ' + username + '; AWS Key ID: ' + accessKeyID + '; Items Copied: ' + commands + '; Note: ' + logNote)
+        logger.info('Region: ' + state.upper() + '; Repo version: ' + self.version + '; User: ' + username + '; AWS Key ID: ' + accessKeyID + '; Items Copied: ' + commands + '; Note: ' + logNote)
 
         self.__copyS3__(logFolder, destFolder, '--recursive')
         logger.removeHandler(handler)

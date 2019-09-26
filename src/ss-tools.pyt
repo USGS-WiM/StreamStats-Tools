@@ -63,7 +63,7 @@ class updateS3Bucket(object):
         )
         
         state_folder = arcpy.Parameter(
-            displayName="Select input state/region folder",
+            displayName="Select state/region folder",
             name="state_folder",
             datatype="DEFolder",
             parameterType="Optional",
@@ -73,7 +73,7 @@ class updateS3Bucket(object):
             displayName="Select xml file",
             name="xml_files",
             datatype="DEFile",
-            parameterType="Optional",
+            parameterType="Required",
             direction="Input")
         
         copy_bc_layers = arcpy.Parameter(
@@ -119,13 +119,18 @@ class updateS3Bucket(object):
     def isLicensed(self): #optional
         return True
 
-    def updateParameters(self, parameters): #optional
+    def updateParameters(self, parameters):
 
         #if we have an input folder, set checkboxes true
         # if parameters[0].valueAsText:
         #     if parameters[0].altered:
         #         parameters[1].value = "True"
         #         parameters[2].value = "True"
+
+        if not parameters[4].altered:
+            staging = 'E:/staging/data'
+            if (os.path.isdir(staging)):
+                parameters[4].value = staging
 
         return
 
@@ -154,7 +159,7 @@ class basinDelin(object):
         # Define parameter definitions
 
         state_folder = arcpy.Parameter(
-            displayName="Select input state/region folder",
+            displayName="Select state/region folder",
             name="state_folder",
             datatype="DEType",
             parameterType="Required",
@@ -364,7 +369,7 @@ class basinParams(object):
         # Define parameter definitions
 
         state_folder = arcpy.Parameter(
-            displayName="Select input state/region folder",
+            displayName="Select state/region folder",
             name="state_folder",
             datatype="DEFolder",
             parameterType="Required",

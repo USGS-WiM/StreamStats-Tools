@@ -1,0 +1,31 @@
+[
+    {
+        "name": "StreamStats-Tools",
+        "organization": "U.S. Geological Survey",
+        "description": "A collection of tools for StreamStats data preparation and upload to AWS",
+        "version": "v1.1.2",
+        "regions": ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "CRB","DC", "DE", "DRB", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MO_STL", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "PR", "RI", "RRB", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"],
+        "necessaryXMLNodes": [
+            "StreamStatsConfig",
+            "ProgParams",
+            "TemplateView",
+            "GlobalPointDelineation",
+            "WshParams",
+            "ApFields",
+            "ApFunctions",
+            "TempLocation",
+            "ApLayers",
+            "DataPath",
+            "GlobalDataPath",
+            "SnapToleranceNumCells",
+            "CleanupThresholdNumCells",
+            "RASTERDATAPATH",
+            "VECTORDATAPATH",
+            "ParameterDelimiter",
+            "NetworkName",
+            "RelationshipName",
+            "FromProjectionFileName",
+            "GlobalParameter"
+        ]
+    }
+]
