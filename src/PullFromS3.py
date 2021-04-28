@@ -32,6 +32,7 @@ import sys, os, subprocess, fnmatch, traceback
 from ParseData import Main as ParseData
 import datetime, arcpy, json, logging
 import time
+import secrets
 
 class Main(object):
 
@@ -39,7 +40,7 @@ class Main(object):
     def __init__(self, parameters):
         self.isComplete = False
         self.Message = ""
-        workspace = parameters[3].valueAsText
+        workspace = parameters[1].valueAsText if type(parameters[1]).__name__ == 'geoprocessing parameter object' else parameters[1]
 
         self.__TempLocation__ = os.path.join(workspace, "Temp" + time.strftime('%Y%m%d%H%M%S'))
 
@@ -61,25 +62,24 @@ class Main(object):
 
     def __run__(self, parameters, tempLocation):
         self.__sm__('Initialized') 
-        regionID       = parameters[0].valueAsText
-        accessKeyID    = parameters[1].valueAsText
-        accessKey      = parameters[2].valueAsText
-        workspace      = parameters[3].valueAsText
-        copy_whole     = parameters[4].valueAsText
-        copy_archydro  = parameters[5].valueAsText
-        copy_global    = parameters[6].valueAsText
-        huc_ids        = parameters[7].valueAsText
-        copy_bc_layers = parameters[8].valueAsText
-        copy_xml       = parameters[9].valueAsText
-        copy_schema    = parameters[10].valueAsText
+        # adjust for running command line, where the parameters come as normal types, not parameter objects
+        regionID       = parameters[0].valueAsText if type(parameters[0]).__name__ == 'geoprocessing parameter object' else parameters[0]
+        workspace      = parameters[1].valueAsText if type(parameters[1]).__name__ == 'geoprocessing parameter object' else parameters[1]
+        copy_whole     = parameters[2].valueAsText if type(parameters[2]).__name__ == 'geoprocessing parameter object' else parameters[2]
+        copy_archydro  = parameters[3].valueAsText if type(parameters[3]).__name__ == 'geoprocessing parameter object' else parameters[3]
+        copy_global    = parameters[4].valueAsText if type(parameters[4]).__name__ == 'geoprocessing parameter object' else parameters[4]
+        huc_ids        = parameters[5].valueAsText if type(parameters[5]).__name__ == 'geoprocessing parameter object' else parameters[5]
+        copy_bc_layers = parameters[6].valueAsText if type(parameters[6]).__name__ == 'geoprocessing parameter object' else parameters[6]
+        copy_xml       = parameters[7].valueAsText if type(parameters[7]).__name__ == 'geoprocessing parameter object' else parameters[7]
+        copy_schema    = parameters[8].valueAsText if type(parameters[8]).__name__ == 'geoprocessing parameter object' else parameters[8]
         
         arcpy.env.overwriteOutput = True
 
 
         #start main program
         try:
-            self.__configureAWSKeyID__(accessKeyID)
-            self.__configureAWSKey__(accessKey)
+            self.__configureAWSKeyID__(secrets.accessKeyID)
+            self.__configureAWSKey__(secrets.accessKey)
             
         except ImportError:
             self.__sm__('Error using aws credentials', 'ERROR')
@@ -167,7 +167,7 @@ class Main(object):
                 try:
                     output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
                 except subprocess.CalledProcessError as e:
-                    #messages.addErrorMessage('Configure not successful.  Please make sure you have inserted the correct credentials.')
+                    arcpy.addError('Configure not successful.  Please make sure you have installed the AWS CLI.')
                     self.__sm__(e.output, 'ERROR')
                     arcpy.AddError(e.output)
                     tb = traceback.format_exc()
@@ -186,7 +186,7 @@ class Main(object):
         try:
             output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
-            #messages.addErrorMessage('Configure not successful.  Please make sure you have entered the correct credentials.')
+            arcpy.addError('Configure not successful.  Please make sure you have installed the AWS CLI.')
             self.__sm__(e.output, 'ERROR')
             arcpy.AddError(e.output)
             tb = traceback.format_exc()
@@ -249,15 +249,13 @@ class Main(object):
 if __name__ == '__main__':
     #add stuff here for args, etc. if using from command line
     """
-    C:\Users\kjacobsen\Desktop\StreamStats-Tools\src\PullFromS3.py(['ct', accessKeyID, accessKey, editorName, workspace, state_folder, xml_file, 'true', 'true', 'false',,schema_file])
-     C:\Python27\ArcGISx6410.5\python.exe PullFromS3.py(['ct','test','test',r'C\Users\kjacobsen\Documents\wim_projects\ss_data\test-pull\1','true','false','false','','false','false','false])
+    C:\Users\kjacobsen\Documents\wim_projects\StreamStats-Tools\src\PullFromS3.py(['ri', workspace, 'true', 'false', 'false', '', 'false', 'false', 'false'])
+     C:\Python27\ArcGISx6410.5\python.exe PullFromS3.py(['ri',r'C\Users\kjacobsen\Documents\wim_projects\docs\ss_data\test-ri\1','true','false','false','','false','false','false])
     """
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-region_id", help="specifies the regional folder to pull from S3", type=str, default='all')
-    parser.add_argument("-accessKeyID", help="specifies the AWS Access Key ID for the person pulling the data", type=str, default='xxxxxxxxxxxxxxxxxxxx')
-    parser.add_argument("-accessKey", help="specifies the AWS Secret Access Key of the person pulling the data", type=str, default='xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx')
-    parser.add_argument("-workspace", help="specifies the workspace folder where the regional data will go", type=str, default=r'')
+    parser.add_argument("-region_id", help="specifies the regional folder to pull from S3", type=str, default='ri')
+    parser.add_argument("-workspace", help="specifies the workspace folder where the regional data will go", type=str, default=r'C:\Users\kjacobsen\Documents\wim_projects\docs\ss-data\test-ri\1')
     parser.add_argument("-copy_whole", help="indicates whether to copy the entire regional folder", type=str, default='true')
     parser.add_argument("-copy_whole_archydro", help="indicates whether to copy the entire archydro folder", type=str, default='false')
     parser.add_argument("-copy_global", help="indicates whether to copy the global.gdb", type=str, default='false')
@@ -268,6 +266,6 @@ if __name__ == '__main__':
     
     args = parser.parse_args()
     parameters = []
-    parameters.extend((args.region_id, args.accessKeyID, args.accessKey, args.workspace, args.copy_whole, args.copy_whole_archydro, args.copy_global, 
+    parameters.extend((args.region_id, args.workspace, args.copy_whole, args.copy_whole_archydro, args.copy_global, 
         args.huc_folders,args.copy_bc_layers, args.copy_xml, args.copy_schema))
     Main(parameters)
