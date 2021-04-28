@@ -33,6 +33,7 @@ from ParseData import Main as ParseData
 import datetime, arcpy, json, logging
 import time
 import json
+import secrets
 
 class Main(object):
 
@@ -40,7 +41,7 @@ class Main(object):
     def __init__(self, parameters):
         self.isComplete = False
         self.Message = ""
-        workspace = parameters[4].valueAsText
+        workspace = parameters[2].valueAsText if type(parameters[2]).__name__ == 'geoprocessing parameter object' else parameters[2]
 
         self.__TempLocation__ = os.path.join(workspace, "Temp" + time.strftime('%Y%m%d%H%M%S'))
 
@@ -62,26 +63,25 @@ class Main(object):
 
     def __run__(self, parameters, tempLocation):
         self.__sm__('Initialized')
-        logNote        = parameters[0].valueAsText
-        accessKeyID    = parameters[1].valueAsText
-        accessKey      = parameters[2].valueAsText
-        editorName     = parameters[3].valueAsText
-        workspace      = parameters[4].valueAsText
-        state_folder   = parameters[5].valueAsText
-        xml_file       = parameters[6].valueAsText
-        copy_bc_layers = parameters[7].valueAsText
-        copy_archydro  = parameters[8].valueAsText
-        copy_global    = parameters[9].valueAsText
-        huc_folders    = parameters[10].valueAsText
-        schema_file    = parameters[11].valueAsText
+        # adjust for running command line, where the parameters come as normal types, not parameter objects
+        logNote        = parameters[0].valueAsText if type(parameters[0]).__name__ == 'geoprocessing parameter object' else parameters[0]
+        editorName     = parameters[1].valueAsText if type(parameters[1]).__name__ == 'geoprocessing parameter object' else parameters[1]
+        workspace      = parameters[2].valueAsText if type(parameters[2]).__name__ == 'geoprocessing parameter object' else parameters[2]
+        state_folder   = parameters[3].valueAsText if type(parameters[3]).__name__ == 'geoprocessing parameter object' else parameters[3]
+        xml_file       = parameters[4].valueAsText if type(parameters[4]).__name__ == 'geoprocessing parameter object' else parameters[4]
+        copy_bc_layers = parameters[5].valueAsText if type(parameters[5]).__name__ == 'geoprocessing parameter object' else parameters[5]
+        copy_archydro  = parameters[6].valueAsText if type(parameters[6]).__name__ == 'geoprocessing parameter object' else parameters[6]
+        copy_global    = parameters[7].valueAsText if type(parameters[7]).__name__ == 'geoprocessing parameter object' else parameters[7]
+        huc_folders    = parameters[8].valueAsText if type(parameters[8]).__name__ == 'geoprocessing parameter object' else parameters[8]
+        schema_file    = parameters[9].valueAsText if type(parameters[9]).__name__ == 'geoprocessing parameter object' else parameters[9]
         
         arcpy.env.overwriteOutput = True
 
 
         #start main program
         try:
-            self.__configureAWSKeyID__(accessKeyID)
-            self.__configureAWSKey__(accessKey)
+            self.__configureAWSKeyID__(secrets.accessKeyID)
+            self.__configureAWSKey__(secrets.accessKey)
             user_name = editorName
 
         except ImportError:
@@ -174,7 +174,7 @@ class Main(object):
             seperator = ','
             commands = seperator.join(commands)
                 
-            self.__logData__(destinationBucket, tempLocation, state, accessKeyID, commands, user_name, logNote)
+            self.__logData__(destinationBucket, tempLocation, state, commands, user_name, logNote)
 
             self.isComplete = True
             self.__sm__('Finished \n')
@@ -200,7 +200,7 @@ class Main(object):
         try:
             output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
-            #messages.addErrorMessage('Configure not successful.  Please make sure you have inserted the correct credentials.')
+            arcpy.addError('Configure not successful.  Please make sure you have installed the AWS CLI.')
             self.__sm__(e.output, 'ERROR')
             arcpy.AddError(e.output)
             tb = traceback.format_exc()
@@ -219,7 +219,7 @@ class Main(object):
         try:
             output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
-            #messages.addErrorMessage('Configure not successful.  Please make sure you have entered the correct credentials.')
+            arcpy.addError('Configure not successful.  Please make sure you have installed the AWS CLI.')
             self.__sm__(e.output, 'ERROR')
             arcpy.AddError(e.output)
             tb = traceback.format_exc()
@@ -303,7 +303,6 @@ class Main(object):
             except subprocess.CalledProcessError as e:
                 tb = traceback.format_exc()
                 if 'lock' not in e.output and 'exit status 2' not in tb:
-                    arcpy.AddError('Make sure AWS CLI has been installed')
                     self.__sm__(e.output, 'ERROR')
                     arcpy.AddError(e.output)
                     self.__sm__(tb, 'ERROR')
@@ -322,7 +321,6 @@ class Main(object):
         except subprocess.CalledProcessError as e:
             tb = traceback.format_exc()
             if 'lock' not in e.output and 'exit status 2' not in tb:
-                arcpy.AddError('Make sure AWS CLI has been installed')
                 print e.output
                 arcpy.AddError(e.output)
                 print tb
@@ -335,10 +333,10 @@ class Main(object):
         """checkS3Bucket(fileLocation=None)
             function to check for existence of files in s3 bucket
         """
-        cmd = "aws s3 ls " + fileLocation + " | wc -l"
+        cmd = "aws s3 ls " + fileLocation
         try:
-            output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
-            if '0' in output:
+            output = subprocess.call(cmd, shell=True)
+            if output == 1:
                 return 'False'
             else:
                 return 'True'
@@ -355,7 +353,7 @@ class Main(object):
         else:
             self.__sm__('Received list of elements in bucket')
 
-    def __logData__(self, destinationBucket, workspace=None,state=None, accessKeyID=None, commands=None, username=None, logNote=None):
+    def __logData__(self, destinationBucket, workspace=None,state=None, commands=None, username=None, logNote=None):
         logFolder = os.path.join(workspace, 'log')
         logdir = os.path.join(logFolder, state.upper() + 'log.txt')
         destFolder = destinationBucket + '/' + state.lower() + '/log'
@@ -377,7 +375,7 @@ class Main(object):
         formatter.converter = time.gmtime
         handler.setFormatter(formatter)
 
-        logger.info('Region: ' + state.upper() + '; Repo version: ' + self.version + '; User: ' + username + '; AWS Key ID: ' + accessKeyID + '; Items Copied: ' + commands + '; Note: ' + logNote)
+        logger.info('Region: ' + state.upper() + '; Repo version: ' + self.version + '; User: ' + username + '; Items Copied: ' + commands + '; Note: ' + logNote)
 
         self.__copyS3__(logFolder, destFolder, '--recursive')
         logger.removeHandler(handler)
@@ -395,36 +393,32 @@ if __name__ == '__main__':
     #add stuff here for args, etc. if using from command line
     """
         logNote        = parameters[0].valueAsText
-        accessKeyID    = parameters[1].valueAsText
-        accessKey      = parameters[2].valueAsText
-        editorName     = parameters[3].valueAsText
-        workspace      = parameters[4].valueAsText
-        state_folder   = parameters[5].valueAsText
-        xml_file       = parameters[6].valueAsText
-        copy_bc_layers = parameters[7].valueAsText
-        copy_archydro  = parameters[8].valueAsText
-        copy_global    = parameters[9].valueAsText
-        huc_folders    = parameters[10].valueAsText
-        schema_file    = parameters[11].valueAsText
-    C:\Users\kjacobsen\Desktop\StreamStats-Tools\src\UpdateS3.py(['testing', accessKeyID, accessKey, editorName, workspace, state_folder, xml_file, 'true', 'true', 'false',,schema_file])
+        editorName     = parameters[1].valueAsText
+        workspace      = parameters[2].valueAsText
+        state_folder   = parameters[3].valueAsText
+        xml_file       = parameters[4].valueAsText
+        copy_bc_layers = parameters[5].valueAsText
+        copy_archydro  = parameters[6].valueAsText
+        copy_global    = parameters[7].valueAsText
+        huc_folders    = parameters[8].valueAsText
+        schema_file    = parameters[9].valueAsText
+    C:\Users\kjacobsen\Desktop\StreamStats-Tools\src\UpdateS3.py(['testing', editorName, workspace, state_folder, xml_file, 'true', 'true', 'false',,schema_file])
     """
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-logNote", help="describes the purpose of the the upload, and any changes made to the data", type=str, default="Testing")
-    parser.add_argument("-accessKeyID", help="specifies the AWS Access Key ID for the person updating the data", type=str, default='xxxxxxxxxxxxxxxxxxxx')
-    parser.add_argument("-accessKey", help="specifies the AWS Secret Access Key of the person updating the data", type=str, default='xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx')
-    parser.add_argument("-editorName", help="specifies the name of the person who edited/is uploading the data", type=str, default="Editor Name")
-    parser.add_argument("-workspace", help="specifies the temporary workspace where the regional data will go before parsing and uploading", type=str, default=r'')
-    parser.add_argument("-state_folder", help="specifies the regional folder containing 'archydro' and bc_layers' folders", type=str, default=r'E:\data\vt')
-    parser.add_argument("-xml_file", help="specifies the regional xml file' folders", type=str, default=r'E:\xml\StreamStatsVT.xml')
-    parser.add_argument("-copy_bc_layers", help="indicates whether to copy the entire bc_layers folder", type=str, default='true')
-    parser.add_argument("-copy_archydro", help="indicates whether to copy the entire archydro folder", type=str, default='true')
-    parser.add_argument("-copy_global", help="indicates whether to copy the global.gdb", type=str, default='false')
+    parser.add_argument("-editorName", help="specifies the name of the person who edited/is uploading the data", type=str, default="KJ")
+    parser.add_argument("-workspace", help="specifies the temporary workspace where the regional data will go before parsing and uploading", type=str, default=r'C:\Users\kjacobsen\Documents\wim_projects\docs\ss-data\test-ri\1')
+    parser.add_argument("-state_folder", help="specifies the regional folder containing 'archydro' and bc_layers' folders", type=str, default=r'C:\Users\kjacobsen\Documents\wim_projects\docs\ss-data\test-ri\1\ri')
+    parser.add_argument("-xml_file", help="specifies the regional xml file' folders", type=str, default=r'C:\Users\kjacobsen\Documents\wim_projects\docs\ss-data\test-ri\1\ri\StreamStatsRI.xml')
+    parser.add_argument("-copy_bc_layers", help="indicates whether to copy the entire bc_layers folder", type=str, default='false')
+    parser.add_argument("-copy_archydro", help="indicates whether to copy the entire archydro folder", type=str, default='false')
+    parser.add_argument("-copy_global", help="indicates whether to copy the global.gdb", type=str, default='true')
     parser.add_argument("-huc_folders", help="indicates which huc folders to upload", type=str, default='')
-    parser.add_argument("-schema_file", help="specifies the location of the regional schema .gdb", type=str, default='E:\schemas\VT_ss.gdb')
+    parser.add_argument("-schema_file", help="specifies the location of the regional schema .gdb", type=str, default=r'C:\Users\kjacobsen\Documents\wim_projects\docs\ss-data\test-ri\1\ri\RI_ss.gdb')
 
     args = parser.parse_args()
     parameters = []
-    parameters.extend((args.logNote, args.accessKeyID, args.accessKey, args.editorName, args.workspace, args.state_folder, args.xml_file ,args.copy_bc_layers, 
+    parameters.extend((args.logNote, args.editorName, args.workspace, args.state_folder, args.xml_file ,args.copy_bc_layers, 
         args.copy_archydro,args.copy_global, args.huc_folders, args.schema_file))
     Main(parameters)    

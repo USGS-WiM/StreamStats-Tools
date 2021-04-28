@@ -33,20 +33,6 @@ class updateS3Bucket(object):
             parameterType="Required",
             direction="Input")
 
-        access_key_id = arcpy.Parameter(
-            displayName="Your AWS Access Key ID",
-            name="access_key_id",
-            datatype="GPString",
-            parameterType="Required",
-            direction="Input")
-
-        access_key = arcpy.Parameter(
-            displayName="Your AWS Secret Access Key",
-            name="access_key",
-            datatype="GPString",
-            parameterType="Required",
-            direction="Input")
-
         editor_name = arcpy.Parameter(
             displayName="Your name",
             name="editor_name",
@@ -112,7 +98,7 @@ class updateS3Bucket(object):
             parameterType="Optional",
             direction="Input")
         
-        parameters = [log_Note, access_key_id, access_key, editor_name, workspace, state_folder, xml_file, copy_bc_layers, copy_archydro, copy_global, huc_folders, schema_file]
+        parameters = [log_Note, editor_name, workspace, state_folder, xml_file, copy_bc_layers, copy_archydro, copy_global, huc_folders, schema_file]
     
         return parameters
 
@@ -121,28 +107,22 @@ class updateS3Bucket(object):
 
     def updateParameters(self, parameters):
 
-        #if we have an input folder, set checkboxes true
-        # if parameters[0].valueAsText:
-        #     if parameters[0].altered:
-        #         parameters[1].value = "True"
-        #         parameters[2].value = "True"
-
-        if not parameters[4].altered:
+        if not parameters[2].altered:
             staging = 'E:/staging/data'
             if (os.path.isdir(staging)):
-                parameters[4].value = staging
+                parameters[2].value = staging
 
         return
 
     def updateMessages(self, parameters):
-        if parameters[1].altered:
-            logNote = parameters[1].valueAsText
+        if parameters[0].altered:
+            logNote = parameters[0].valueAsText
             if len(logNote) > 50:
                 pythonaddins.MessageBox('Note cannot exceed 50 characters', 'WARNING', 0)
-        if not parameters[10].altered:
-            parameters[10].value = ''
-        if parameters[9].value == True or parameters[10].valueAsText:
-            parameters[8].value = False
+        if not parameters[8].altered:
+            parameters[8].value = ''
+        if parameters[7].value == True or parameters[8].valueAsText:
+            parameters[6].value = False
         return
 
     def execute(self, parameters, messages):
@@ -459,19 +439,6 @@ class pullS3(object):
             parameterType="Required",
             direction="Input"
         )
-        access_key_id = arcpy.Parameter(
-            displayName="Your AWS Access Key ID",
-            name="access_key_id",
-            datatype="GPString",
-            parameterType="Required",
-            direction="Input")
-
-        access_key = arcpy.Parameter(
-            displayName="Your AWS Secret Access Key",
-            name="access_key",
-            datatype="GPString",
-            parameterType="Required",
-            direction="Input")
         
         workspace = arcpy.Parameter(
             displayName = "Destination Folder",
@@ -537,7 +504,7 @@ class pullS3(object):
         )
 
         
-        parameters = [region_id, access_key_id, access_key, workspace, copy_whole, copy_whole_archydro, copy_global, huc_folders, copy_bc_layers, copy_xml, copy_schema]
+        parameters = [region_id, workspace, copy_whole, copy_whole_archydro, copy_global, huc_folders, copy_bc_layers, copy_xml, copy_schema]
     
         return parameters
 
@@ -545,22 +512,15 @@ class pullS3(object):
         return True
 
     def updateParameters(self, parameters): #optional
-
-        #if we have an input folder, set checkboxes true
-        # if parameters[0].valueAsText:
-        #     if parameters[0].altered:
-        #         parameters[1].value = "True"
-        #         parameters[2].value = "True"
-
         return
 
     def updateMessages(self, parameters):
-        if not parameters[7].altered:
-            parameters[7].value = ''
-        if parameters[6].value == True or parameters[7].valueAsText:
-            parameters[5].value = False
-        if any([parameters[5].value == True, parameters[7].valueAsText, parameters[6].value == True, parameters[8].value == True, parameters[9].value == True, parameters[10].value == True]):
-            parameters[4].value = False
+        if not parameters[5].altered:
+            parameters[5].value = ''
+        if parameters[4].value == True or parameters[5].valueAsText:
+            parameters[3].value = False
+        if any([parameters[3].value == True, parameters[4].value == True, parameters[5].valueAsText, parameters[6].value == True, parameters[7].value == True, parameters[8].value == True]):
+            parameters[2].value = False
         return
 
     def execute(self, parameters, messages):

@@ -3,7 +3,7 @@
         "name": "StreamStats-Tools",
         "organization": "U.S. Geological Survey",
         "description": "A collection of tools for StreamStats data preparation and upload to AWS",
-        "version": "v1.1.1",
+        "version": "v1.2.0",
         "regions": ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "CRB","DC", "DE", "DRB", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MO_STL", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "PR", "RI", "RRB", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"],
         "necessaryXMLNodes": [
             "StreamStatsConfig",
