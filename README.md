@@ -13,13 +13,21 @@ ArcGIS
 
 [Amazon Web Services CLI](https://docs.aws.amazon.com/cli/latest/userguide/installing.html)
 
+`Secrets.py` - you will need a `secrets.py` file placed within the `src` folder. It should be formatted:
+```
+accessKeyID = 'xxxxxxxxxxxxxxxxx'
+accessKey = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+```
+
+where the accessKeyID is the username and accessKey is the password from the wim_gis_user found in the WIM Keepass > StreamStats. Note that this file is in the .gitignore and should NEVER be pushed up to GitHub.
+
 ## Getting Started
 
 These instructions will get you a copy of the project up and running on your local machine for development and testing purposes.
 
 ## Building and testing
 
-To test your edits and use the tool, open ArcCatalog or ArcMap and navigate to your local repo directory. Expand the "src" folder, and you should see a toolbox named "ss-tools.pyt".
+To test your edits and use the tool, open ArcCatalog or ArcMap and navigate to your local repo directory. Expand the "src" folder, and you should see a toolbox named "ss-tools.pyt". You can also run the python files separately, but there are often inconsistencies when run in ArcGIS.
 
 You may need to restart your ArcGIS session to see your edits.
 
